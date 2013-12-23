@@ -1,0 +1,1809 @@
+From dd37648c2dfb0405e11028c264ef37200ef75001 Mon Sep 17 00:00:00 2001
+From: David Reveman <reveman@chromium.org>
+Date: Fri, 16 Aug 2013 17:31:00 +0000
+Subject: [PATCH] gpu: Refactor GpuMemoryBuffer framework for multi-process
+ support.
+
+This removes the ImageFactory interface and adjusts the buffer
+allocation system for future multi-process support.
+
+Also includes proper plumbing of internalformat to GLImage implementation
+and makes sure the compositor is using the correct format.
+
+TEST=gpu_unittests --gtest_filter=MockGpuMemoryBufferTest.Lifecycle
+BUG=261649
+
+Review URL: https://chromiumcodereview.appspot.com/20017005
+
+(CM: Add the newly added file to the makefiles)
+Signed-off-by: Chirayu Desai <cdesai@cyanogenmod.org>
+Signed-off-by: Joel Teichroeb <joel@teichroeb.net>
+Change-Id: Iff859f68f7097a36262bd24c0face0edf63f4a4c
+---
+ android_webview/lib/main/aw_main_delegate.cc       |  2 +-
+ cc/resources/image_raster_worker_pool.cc           |  4 ++
+ cc/resources/image_raster_worker_pool.h            |  1 +
+ cc/resources/pixel_buffer_raster_worker_pool.cc    |  4 ++
+ cc/resources/pixel_buffer_raster_worker_pool.h     |  1 +
+ cc/resources/raster_worker_pool.h                  |  4 ++
+ cc/resources/raster_worker_pool_perftest.cc        |  4 ++
+ cc/resources/resource_provider.cc                  |  1 +
+ cc/resources/tile_manager.cc                       | 14 ++--
+ cc/resources/tile_manager.h                        |  5 +-
+ cc/test/fake_tile_manager.cc                       |  7 +-
+ gpu/command_buffer/client/client_test_helper.cc    |  6 ++
+ gpu/command_buffer/client/client_test_helper.h     | 17 +++++
+ gpu/command_buffer/client/gl_in_process_context.cc | 38 +---------
+ gpu/command_buffer/client/gl_in_process_context.h  |  5 --
+ gpu/command_buffer/client/gles2_implementation.cc  |  8 +--
+ gpu/command_buffer/client/gles2_implementation.h   |  6 +-
+ .../client/gles2_implementation_unittest.cc        |  8 ++-
+ .../client/gpu_memory_buffer_tracker.cc            | 38 +++++-----
+ .../client/gpu_memory_buffer_tracker.h             | 19 +++--
+ gpu/command_buffer/client/image_factory.h          | 35 ---------
+ gpu/command_buffer/common/gles2_cmd_format.h       |  1 -
+ gpu/command_buffer/common/gpu_control.h            | 39 ++++++++++
+ gpu/command_buffer/service/context_group.cc        |  1 -
+ gpu/command_buffer/service/gpu_control_service.cc  | 74 +++++++++++++++++++
+ gpu/command_buffer/service/gpu_control_service.h   | 51 +++++++++++++
+ .../service/gpu_memory_buffer_manager.h            | 28 ++++++++
+ gpu/command_buffer/service/image_manager.cc        | 30 ++++++++
+ gpu/command_buffer/service/image_manager.h         | 15 +++-
+ .../service/in_process_command_buffer.cc           | 84 +++++++++-------------
+ .../service/in_process_command_buffer.h            | 24 ++++---
+ .../tests/gl_gpu_memory_buffer_unittests.cc        | 62 ++++++----------
+ gpu/command_buffer/tests/gl_manager.cc             | 10 ++-
+ gpu/command_buffer/tests/gl_manager.h              |  9 ++-
+ gpu/command_buffer_common.gypi                     |  1 +
+ gpu/command_buffer_service.gypi                    |  9 ++-
+ gpu/command_buffer_service.target.darwin-arm.mk    |  1 +
+ gpu/command_buffer_service.target.darwin-mips.mk   |  1 +
+ gpu/command_buffer_service.target.darwin-x86.mk    |  1 +
+ gpu/command_buffer_service.target.linux-arm.mk     |  1 +
+ gpu/command_buffer_service.target.linux-mips.mk    |  1 +
+ gpu/command_buffer_service.target.linux-x86.mk     |  1 +
+ gpu/gpu_common.gypi                                |  1 -
+ ui/gl/gl_image.h                                   |  4 +-
+ ui/gl/gl_image_android.cc                          |  7 +-
+ ui/gl/gl_image_mac.cc                              |  7 +-
+ ui/gl/gl_image_ozone.cc                            |  4 +-
+ ui/gl/gl_image_shm.cc                              | 31 ++++++--
+ ui/gl/gl_image_shm.h                               |  3 +-
+ ui/gl/gl_image_win.cc                              |  7 +-
+ ui/gl/gl_image_x11.cc                              |  7 +-
+ 51 files changed, 474 insertions(+), 268 deletions(-)
+ delete mode 100644 gpu/command_buffer/client/image_factory.h
+ create mode 100644 gpu/command_buffer/common/gpu_control.h
+ create mode 100644 gpu/command_buffer/service/gpu_control_service.cc
+ create mode 100644 gpu/command_buffer/service/gpu_control_service.h
+ create mode 100644 gpu/command_buffer/service/gpu_memory_buffer_manager.h
+
+diff --git a/android_webview/lib/main/aw_main_delegate.cc b/android_webview/lib/main/aw_main_delegate.cc
+index 9537a6d..6a868af 100644
+--- a/android_webview/lib/main/aw_main_delegate.cc
++++ b/android_webview/lib/main/aw_main_delegate.cc
+@@ -48,7 +48,7 @@ AwMainDelegate::~AwMainDelegate() {
+ bool AwMainDelegate::BasicStartupComplete(int* exit_code) {
+   content::SetContentClient(&content_client_);
+ 
+-  gpu::GLInProcessContext::SetGpuMemoryBufferFactory(
++  gpu::InProcessCommandBuffer::SetGpuMemoryBufferFactory(
+       gpu_memory_buffer_factory_.get());
+   gpu::InProcessCommandBuffer::EnableVirtualizedContext();
+ 
+diff --git a/cc/resources/image_raster_worker_pool.cc b/cc/resources/image_raster_worker_pool.cc
+index 408459c..7e524f6 100644
+--- a/cc/resources/image_raster_worker_pool.cc
++++ b/cc/resources/image_raster_worker_pool.cc
+@@ -156,6 +156,10 @@ void ImageRasterWorkerPool::ScheduleTasks(RasterTask::Queue* queue) {
+       "state", TracedValue::FromValue(StateAsValue().release()));
+ }
+ 
++GLenum ImageRasterWorkerPool::GetResourceFormat() const {
++  return GL_RGBA;  // Only format supported by CHROMIUM_map_image
++}
++
+ void ImageRasterWorkerPool::OnRasterTasksFinished() {
+   DCHECK(raster_tasks_pending_);
+   raster_tasks_pending_ = false;
+diff --git a/cc/resources/image_raster_worker_pool.h b/cc/resources/image_raster_worker_pool.h
+index d4f4d74..1816b27 100644
+--- a/cc/resources/image_raster_worker_pool.h
++++ b/cc/resources/image_raster_worker_pool.h
+@@ -21,6 +21,7 @@ class CC_EXPORT ImageRasterWorkerPool : public RasterWorkerPool {
+ 
+   // Overridden from RasterWorkerPool:
+   virtual void ScheduleTasks(RasterTask::Queue* queue) OVERRIDE;
++  virtual GLenum GetResourceFormat() const OVERRIDE;
+   virtual void OnRasterTasksFinished() OVERRIDE;
+   virtual void OnRasterTasksRequiredForActivationFinished() OVERRIDE;
+ 
+diff --git a/cc/resources/pixel_buffer_raster_worker_pool.cc b/cc/resources/pixel_buffer_raster_worker_pool.cc
+index a03ed81..7618803 100644
+--- a/cc/resources/pixel_buffer_raster_worker_pool.cc
++++ b/cc/resources/pixel_buffer_raster_worker_pool.cc
+@@ -236,6 +236,10 @@ void PixelBufferRasterWorkerPool::ScheduleTasks(RasterTask::Queue* queue) {
+       "state", TracedValue::FromValue(StateAsValue().release()));
+ }
+ 
++GLenum PixelBufferRasterWorkerPool::GetResourceFormat() const {
++  return resource_provider()->best_texture_format();
++}
++
+ void PixelBufferRasterWorkerPool::CheckForCompletedTasks() {
+   TRACE_EVENT0("cc", "PixelBufferRasterWorkerPool::CheckForCompletedTasks");
+ 
+diff --git a/cc/resources/pixel_buffer_raster_worker_pool.h b/cc/resources/pixel_buffer_raster_worker_pool.h
+index d9613f7..9e966d3 100644
+--- a/cc/resources/pixel_buffer_raster_worker_pool.h
++++ b/cc/resources/pixel_buffer_raster_worker_pool.h
+@@ -29,6 +29,7 @@ class CC_EXPORT PixelBufferRasterWorkerPool : public RasterWorkerPool {
+ 
+   // Overridden from RasterWorkerPool:
+   virtual void ScheduleTasks(RasterTask::Queue* queue) OVERRIDE;
++  virtual GLenum GetResourceFormat() const OVERRIDE;
+   virtual void OnRasterTasksFinished() OVERRIDE;
+   virtual void OnRasterTasksRequiredForActivationFinished() OVERRIDE;
+ 
+diff --git a/cc/resources/raster_worker_pool.h b/cc/resources/raster_worker_pool.h
+index d0e1e7c..8c4b493 100644
+--- a/cc/resources/raster_worker_pool.h
++++ b/cc/resources/raster_worker_pool.h
+@@ -13,6 +13,7 @@
+ #include "cc/resources/raster_mode.h"
+ #include "cc/resources/tile_priority.h"
+ #include "cc/resources/worker_pool.h"
++#include "third_party/khronos/GLES2/gl2.h"
+ 
+ class SkDevice;
+ 
+@@ -183,6 +184,9 @@ class CC_EXPORT RasterWorkerPool : public WorkerPool {
+   // even if they later get canceled by another call to ScheduleTasks().
+   virtual void ScheduleTasks(RasterTask::Queue* queue) = 0;
+ 
++  // Returns the format that needs to be used for raster task resources.
++  virtual GLenum GetResourceFormat() const = 0;
++
+   // TODO(vmpstr): Figure out an elegant way to not pass this many parameters.
+   static RasterTask CreateRasterTask(
+       const Resource* resource,
+diff --git a/cc/resources/raster_worker_pool_perftest.cc b/cc/resources/raster_worker_pool_perftest.cc
+index a4a258b..9215950 100644
+--- a/cc/resources/raster_worker_pool_perftest.cc
++++ b/cc/resources/raster_worker_pool_perftest.cc
+@@ -38,6 +38,10 @@ class PerfRasterWorkerPool : public RasterWorkerPool {
+   virtual void ScheduleTasks(RasterTask::Queue* queue) OVERRIDE {
+     NOTREACHED();
+   }
++  virtual GLenum GetResourceFormat() const OVERRIDE {
++    NOTREACHED();
++    return GL_RGBA;
++  }
+   virtual void OnRasterTasksFinished() OVERRIDE {
+     NOTREACHED();
+   }
+diff --git a/cc/resources/resource_provider.cc b/cc/resources/resource_provider.cc
+index 11eaab0..3952535 100644
+--- a/cc/resources/resource_provider.cc
++++ b/cc/resources/resource_provider.cc
+@@ -1353,6 +1353,7 @@ void ResourceProvider::AcquireImage(ResourceId id) {
+   resource->allocated = true;
+   WebGraphicsContext3D* context3d = output_surface_->context3d();
+   DCHECK(context3d);
++  DCHECK_EQ(static_cast<GLenum>(GL_RGBA), resource->format);
+   resource->image_id = context3d->createImageCHROMIUM(
+       resource->size.width(), resource->size.height(), GL_RGBA8_OES);
+   DCHECK(resource->image_id);
+diff --git a/cc/resources/tile_manager.cc b/cc/resources/tile_manager.cc
+index e6850bc..91070d9 100644
+--- a/cc/resources/tile_manager.cc
++++ b/cc/resources/tile_manager.cc
+@@ -130,8 +130,7 @@ scoped_ptr<TileManager> TileManager::Create(
+                       PixelBufferRasterWorkerPool::Create(
+                           resource_provider, num_raster_threads),
+                       num_raster_threads,
+-                      rendering_stats_instrumentation,
+-                      resource_provider->best_texture_format()));
++                      rendering_stats_instrumentation));
+ }
+ 
+ TileManager::TileManager(
+@@ -139,8 +138,7 @@ TileManager::TileManager(
+     ResourceProvider* resource_provider,
+     scoped_ptr<RasterWorkerPool> raster_worker_pool,
+     size_t num_raster_threads,
+-    RenderingStatsInstrumentation* rendering_stats_instrumentation,
+-    GLenum texture_format)
++    RenderingStatsInstrumentation* rendering_stats_instrumentation)
+     : client_(client),
+       resource_pool_(ResourcePool::Create(resource_provider)),
+       raster_worker_pool_(raster_worker_pool.Pass()),
+@@ -149,8 +147,7 @@ TileManager::TileManager(
+       all_tiles_required_for_activation_have_been_initialized_(true),
+       ever_exceeded_memory_budget_(false),
+       rendering_stats_instrumentation_(rendering_stats_instrumentation),
+-      did_initialize_visible_tile_(false),
+-      texture_format_(texture_format) {
++      did_initialize_visible_tile_(false) {
+   raster_worker_pool_->SetClient(this);
+ }
+ 
+@@ -727,8 +724,9 @@ RasterWorkerPool::RasterTask TileManager::CreateRasterTask(Tile* tile) {
+   ManagedTileState& mts = tile->managed_state();
+ 
+   scoped_ptr<ResourcePool::Resource> resource =
+-      resource_pool_->AcquireResource(tile->tile_size_.size(),
+-                                      texture_format_);
++      resource_pool_->AcquireResource(
++          tile->tile_size_.size(),
++          raster_worker_pool_->GetResourceFormat());
+   const Resource* const_resource = resource.get();
+ 
+   // Create and queue all image decode tasks that this tile depends on.
+diff --git a/cc/resources/tile_manager.h b/cc/resources/tile_manager.h
+index 2e226c9..b223e35 100644
+--- a/cc/resources/tile_manager.h
++++ b/cc/resources/tile_manager.h
+@@ -84,8 +84,7 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient {
+               ResourceProvider* resource_provider,
+               scoped_ptr<RasterWorkerPool> raster_worker_pool,
+               size_t num_raster_threads,
+-              RenderingStatsInstrumentation* rendering_stats_instrumentation,
+-              GLenum texture_format);
++              RenderingStatsInstrumentation* rendering_stats_instrumentation);
+ 
+   // Methods called by Tile
+   friend class Tile;
+@@ -154,8 +153,6 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient {
+ 
+   bool did_initialize_visible_tile_;
+ 
+-  GLenum texture_format_;
+-
+   typedef base::hash_map<uint32_t, RasterWorkerPool::Task> PixelRefTaskMap;
+   typedef base::hash_map<int, PixelRefTaskMap> LayerPixelRefTaskMap;
+   LayerPixelRefTaskMap image_decode_tasks_;
+diff --git a/cc/test/fake_tile_manager.cc b/cc/test/fake_tile_manager.cc
+index c132254..7749965 100644
+--- a/cc/test/fake_tile_manager.cc
++++ b/cc/test/fake_tile_manager.cc
+@@ -15,6 +15,7 @@ class FakeRasterWorkerPool : public RasterWorkerPool {
+   FakeRasterWorkerPool() : RasterWorkerPool(NULL, 1) {}
+ 
+   virtual void ScheduleTasks(RasterTask::Queue* queue) OVERRIDE {}
++  virtual GLenum GetResourceFormat() const OVERRIDE { return GL_RGBA; }
+   virtual void OnRasterTasksFinished() OVERRIDE {}
+   virtual void OnRasterTasksRequiredForActivationFinished() OVERRIDE {}
+ };
+@@ -26,8 +27,7 @@ FakeTileManager::FakeTileManager(TileManagerClient* client)
+                   NULL,
+                   make_scoped_ptr<RasterWorkerPool>(new FakeRasterWorkerPool),
+                   1,
+-                  NULL,
+-                  GL_RGBA) {}
++                  NULL) {}
+ 
+ FakeTileManager::FakeTileManager(TileManagerClient* client,
+                                  ResourceProvider* resource_provider)
+@@ -35,8 +35,7 @@ FakeTileManager::FakeTileManager(TileManagerClient* client,
+                   resource_provider,
+                   make_scoped_ptr<RasterWorkerPool>(new FakeRasterWorkerPool),
+                   1,
+-                  NULL,
+-                  resource_provider->best_texture_format()) {}
++                  NULL) {}
+ 
+ FakeTileManager::~FakeTileManager() {}
+ 
+diff --git a/gpu/command_buffer/client/client_test_helper.cc b/gpu/command_buffer/client/client_test_helper.cc
+index cccfa3b..31a91b2 100644
+--- a/gpu/command_buffer/client/client_test_helper.cc
++++ b/gpu/command_buffer/client/client_test_helper.cc
+@@ -151,6 +151,12 @@ void MockClientCommandBufferMockFlush::DelegateToFake() {
+           this, &MockCommandBufferBase::FlushHelper));
+ }
+ 
++MockClientGpuControl::MockClientGpuControl() {
++}
++
++MockClientGpuControl::~MockClientGpuControl() {
++}
++
+ }  // namespace gpu
+ 
+ 
+diff --git a/gpu/command_buffer/client/client_test_helper.h b/gpu/command_buffer/client/client_test_helper.h
+index 7010704..e9d6c36 100644
+--- a/gpu/command_buffer/client/client_test_helper.h
++++ b/gpu/command_buffer/client/client_test_helper.h
+@@ -11,6 +11,7 @@
+ #include "gpu/command_buffer/common/cmd_buffer_common.h"
+ #include "gpu/command_buffer/common/command_buffer.h"
+ #include "gpu/command_buffer/common/compiler_specific.h"
++#include "gpu/command_buffer/common/gpu_control.h"
+ #include "testing/gmock/include/gmock/gmock.h"
+ #include "testing/gtest/include/gtest/gtest.h"
+ 
+@@ -81,6 +82,22 @@ class MockClientCommandBufferMockFlush : public MockClientCommandBuffer {
+   void DelegateToFake();
+ };
+ 
++class MockClientGpuControl : public GpuControl {
++ public:
++  MockClientGpuControl();
++  virtual ~MockClientGpuControl();
++
++  MOCK_METHOD4(CreateGpuMemoryBuffer,
++               gfx::GpuMemoryBuffer*(size_t width,
++                                     size_t height,
++                                     unsigned internalformat,
++                                     int32* id));
++  MOCK_METHOD1(DestroyGpuMemoryBuffer, void(int32 id));
++
++ private:
++  DISALLOW_COPY_AND_ASSIGN(MockClientGpuControl);
++};
++
+ }  // namespace gpu
+ 
+ #endif  // GPU_COMMAND_BUFFER_CLIENT_CLIENT_TEST_HELPER_H_
+diff --git a/gpu/command_buffer/client/gl_in_process_context.cc b/gpu/command_buffer/client/gl_in_process_context.cc
+index 1e0d3cd..5a7b507 100644
+--- a/gpu/command_buffer/client/gl_in_process_context.cc
++++ b/gpu/command_buffer/client/gl_in_process_context.cc
+@@ -23,8 +23,6 @@
+ #include "base/memory/weak_ptr.h"
+ #include "base/message_loop/message_loop.h"
+ #include "gpu/command_buffer/client/gles2_implementation.h"
+-#include "gpu/command_buffer/client/gpu_memory_buffer_factory.h"
+-#include "gpu/command_buffer/client/image_factory.h"
+ #include "gpu/command_buffer/client/transfer_buffer.h"
+ #include "gpu/command_buffer/common/command_buffer.h"
+ #include "gpu/command_buffer/common/constants.h"
+@@ -47,11 +45,8 @@ const size_t kStartTransferBufferSize = 4 * 1024 * 1024;
+ const size_t kMinTransferBufferSize = 1 * 256 * 1024;
+ const size_t kMaxTransferBufferSize = 16 * 1024 * 1024;
+ 
+-static GpuMemoryBufferFactory* g_gpu_memory_buffer_factory = NULL;
+-
+ class GLInProcessContextImpl
+     : public GLInProcessContext,
+-      public gles2::ImageFactory,
+       public base::SupportsWeakPtr<GLInProcessContextImpl> {
+  public:
+   explicit GLInProcessContextImpl();
+@@ -74,12 +69,6 @@ class GLInProcessContextImpl
+       OVERRIDE;
+   virtual gles2::GLES2Implementation* GetImplementation() OVERRIDE;
+ 
+-  // ImageFactory implementation:
+-  virtual scoped_ptr<gfx::GpuMemoryBuffer> CreateGpuMemoryBuffer(
+-      int width, int height, GLenum internalformat,
+-      unsigned* image_id) OVERRIDE;
+-  virtual void DeleteGpuMemoryBuffer(unsigned image_id) OVERRIDE;
+-
+ #if defined(OS_ANDROID)
+   virtual scoped_refptr<gfx::SurfaceTextureBridge> GetSurfaceTexture(
+       uint32 stream_id) OVERRIDE;
+@@ -117,24 +106,6 @@ size_t SharedContextCount() {
+   return g_all_shared_contexts.Get().size();
+ }
+ 
+-scoped_ptr<gfx::GpuMemoryBuffer> GLInProcessContextImpl::CreateGpuMemoryBuffer(
+-    int width, int height, GLenum internalformat, unsigned int* image_id) {
+-  scoped_ptr<gfx::GpuMemoryBuffer> buffer(
+-      g_gpu_memory_buffer_factory->CreateGpuMemoryBuffer(width,
+-                                                         height,
+-                                                         internalformat));
+-  if (!buffer)
+-    return scoped_ptr<gfx::GpuMemoryBuffer>();
+-
+-  *image_id = command_buffer_->CreateImageForGpuMemoryBuffer(
+-      buffer->GetHandle(), gfx::Size(width, height));
+-  return buffer.Pass();
+-}
+-
+-void GLInProcessContextImpl::DeleteGpuMemoryBuffer(unsigned int image_id) {
+-  command_buffer_->RemoveImage(image_id);
+-}
+-
+ GLInProcessContextImpl::GLInProcessContextImpl()
+     : share_group_id_(0), context_lost_(false) {}
+ 
+@@ -288,7 +259,7 @@ bool GLInProcessContextImpl::Initialize(
+       share_group,
+       transfer_buffer_.get(),
+       false,
+-      this));
++      command_buffer_.get()));
+ 
+   if (share_resources) {
+     g_all_shared_contexts.Get().insert(this);
+@@ -437,11 +408,4 @@ GLInProcessContext* GLInProcessContext::CreateWithSurface(
+   return context.release();
+ }
+ 
+-// static
+-void GLInProcessContext::SetGpuMemoryBufferFactory(
+-    GpuMemoryBufferFactory* factory) {
+-  DCHECK_EQ(0u, SharedContextCount());
+-  g_gpu_memory_buffer_factory = factory;
+-}
+-
+ }  // namespace gpu
+diff --git a/gpu/command_buffer/client/gl_in_process_context.h b/gpu/command_buffer/client/gl_in_process_context.h
+index 13dc9b2..ec7bdc5 100644
+--- a/gpu/command_buffer/client/gl_in_process_context.h
++++ b/gpu/command_buffer/client/gl_in_process_context.h
+@@ -28,8 +28,6 @@ namespace gles2 {
+ class GLES2Implementation;
+ }
+ 
+-class GpuMemoryBufferFactory;
+-
+ // The default uninitialized value is -1.
+ struct GLES2_IMPL_EXPORT GLInProcessContextAttribs {
+   GLInProcessContextAttribs();
+@@ -48,9 +46,6 @@ class GLES2_IMPL_EXPORT GLInProcessContext {
+  public:
+   virtual ~GLInProcessContext() {}
+ 
+-  // Must be called before any GLInProcessContext instances are created.
+-  static void SetGpuMemoryBufferFactory(GpuMemoryBufferFactory* factory);
+-
+   // Create a GLInProcessContext, if |is_offscreen| is true, renders to an
+   // offscreen context. |attrib_list| must be NULL or a NONE-terminated list
+   // of attribute/value pairs.
+diff --git a/gpu/command_buffer/client/gles2_implementation.cc b/gpu/command_buffer/client/gles2_implementation.cc
+index 9285b6d..5a223b4 100644
+--- a/gpu/command_buffer/client/gles2_implementation.cc
++++ b/gpu/command_buffer/client/gles2_implementation.cc
+@@ -86,7 +86,7 @@ GLES2Implementation::GLES2Implementation(
+       ShareGroup* share_group,
+       TransferBufferInterface* transfer_buffer,
+       bool bind_generates_resource,
+-      ImageFactory* image_factory)
++      GpuControl* gpu_control)
+     : helper_(helper),
+       transfer_buffer_(transfer_buffer),
+       angle_pack_reverse_row_order_status_(kUnknownExtensionStatus),
+@@ -111,7 +111,7 @@ GLES2Implementation::GLES2Implementation(
+       use_count_(0),
+       current_query_(NULL),
+       error_message_callback_(NULL),
+-      image_factory_(image_factory) {
++      gpu_control_(gpu_control) {
+   GPU_DCHECK(helper);
+   GPU_DCHECK(transfer_buffer);
+ 
+@@ -165,7 +165,7 @@ bool GLES2Implementation::Initialize(
+ 
+   query_tracker_.reset(new QueryTracker(mapped_memory_.get()));
+   buffer_tracker_.reset(new BufferTracker(mapped_memory_.get()));
+-  gpu_memory_buffer_tracker_.reset(new GpuMemoryBufferTracker(image_factory_));
++  gpu_memory_buffer_tracker_.reset(new GpuMemoryBufferTracker(gpu_control_));
+ 
+ #if defined(GLES2_SUPPORT_CLIENT_SIDE_ARRAYS)
+   GetIdHandler(id_namespaces::kBuffers)->MakeIds(
+@@ -2089,7 +2089,7 @@ const GLubyte* GLES2Implementation::GetStringHelper(GLenum name) {
+             "GL_CHROMIUM_map_sub "
+             "GL_CHROMIUM_shallow_flush "
+             "GL_EXT_unpack_subimage";
+-        if (image_factory_ != NULL) {
++        if (gpu_control_ != NULL) {
+           // The first space character is intentional.
+           str += " GL_CHROMIUM_map_image";
+         }
+diff --git a/gpu/command_buffer/client/gles2_implementation.h b/gpu/command_buffer/client/gles2_implementation.h
+index c2bf49f..bacb582 100644
+--- a/gpu/command_buffer/client/gles2_implementation.h
++++ b/gpu/command_buffer/client/gles2_implementation.h
+@@ -20,7 +20,6 @@
+ #include "gpu/command_buffer/client/gles2_cmd_helper.h"
+ #include "gpu/command_buffer/client/gles2_interface.h"
+ #include "gpu/command_buffer/client/gpu_memory_buffer_tracker.h"
+-#include "gpu/command_buffer/client/image_factory.h"
+ #include "gpu/command_buffer/client/query_tracker.h"
+ #include "gpu/command_buffer/client/ref_counted.h"
+ #include "gpu/command_buffer/client/ring_buffer.h"
+@@ -98,6 +97,7 @@ struct GLUniformDefinitionCHROMIUM;
+ 
+ namespace gpu {
+ 
++class GpuControl;
+ class MappedMemoryManager;
+ class ScopedTransferBufferPtr;
+ class TransferBufferInterface;
+@@ -177,7 +177,7 @@ class GLES2_IMPL_EXPORT GLES2Implementation : public GLES2Interface {
+       ShareGroup* share_group,
+       TransferBufferInterface* transfer_buffer,
+       bool bind_generates_resource,
+-      ImageFactory* image_factory);
++      GpuControl* gpu_control);
+ 
+   virtual ~GLES2Implementation();
+ 
+@@ -668,7 +668,7 @@ class GLES2_IMPL_EXPORT GLES2Implementation : public GLES2Interface {
+ 
+   scoped_ptr<std::string> current_trace_name_;
+ 
+-  ImageFactory* image_factory_;
++  GpuControl* gpu_control_;
+ 
+   DISALLOW_COPY_AND_ASSIGN(GLES2Implementation);
+ };
+diff --git a/gpu/command_buffer/client/gles2_implementation_unittest.cc b/gpu/command_buffer/client/gles2_implementation_unittest.cc
+index e58907c..0289547 100644
+--- a/gpu/command_buffer/client/gles2_implementation_unittest.cc
++++ b/gpu/command_buffer/client/gles2_implementation_unittest.cc
+@@ -366,6 +366,8 @@ class GLES2ImplementationTest : public testing::Test {
+     helper_.reset(new GLES2CmdHelper(command_buffer()));
+     helper_->Initialize(kCommandBufferSizeBytes);
+ 
++    gpu_control_.reset(new StrictMock<MockClientGpuControl>());
++
+     GLES2Implementation::GLStaticState state;
+     GLES2Implementation::GLStaticState::IntState& int_state = state.int_state;
+     int_state.max_combined_texture_image_units = kMaxCombinedTextureImageUnits;
+@@ -401,7 +403,7 @@ class GLES2ImplementationTest : public testing::Test {
+           NULL,
+           transfer_buffer_.get(),
+           bind_generates_resource,
+-          NULL));
++          gpu_control_.get()));
+       ASSERT_TRUE(gl_->Initialize(
+           kTransferBufferSize,
+           kTransferBufferSize,
+@@ -473,6 +475,7 @@ class GLES2ImplementationTest : public testing::Test {
+ 
+   Sequence sequence_;
+   scoped_ptr<MockClientCommandBuffer> command_buffer_;
++  scoped_ptr<MockClientGpuControl> gpu_control_;
+   scoped_ptr<GLES2CmdHelper> helper_;
+   scoped_ptr<MockTransferBuffer> transfer_buffer_;
+   scoped_ptr<GLES2Implementation> gl_;
+@@ -2476,7 +2479,8 @@ TEST_F(GLES2ImplementationTest, GetString) {
+       "GL_CHROMIUM_flipy "
+       "GL_CHROMIUM_map_sub "
+       "GL_CHROMIUM_shallow_flush "
+-      "GL_EXT_unpack_subimage";
++      "GL_EXT_unpack_subimage "
++      "GL_CHROMIUM_map_image";
+   const char kBad = 0x12;
+   struct Cmds {
+     cmd::SetBucketSize set_bucket_size1;
+diff --git a/gpu/command_buffer/client/gpu_memory_buffer_tracker.cc b/gpu/command_buffer/client/gpu_memory_buffer_tracker.cc
+index c1c9b4d..a957cc4 100644
+--- a/gpu/command_buffer/client/gpu_memory_buffer_tracker.cc
++++ b/gpu/command_buffer/client/gpu_memory_buffer_tracker.cc
+@@ -6,15 +6,13 @@
+ 
+ #include "base/memory/scoped_ptr.h"
+ #include "gpu/command_buffer/client/gles2_implementation.h"
+-#include "gpu/command_buffer/client/image_factory.h"
+-#include "ui/gfx/gpu_memory_buffer.h"
++#include "gpu/command_buffer/common/gpu_control.h"
+ 
+ namespace gpu {
+ namespace gles2 {
+ 
+-GpuMemoryBufferTracker::GpuMemoryBufferTracker(ImageFactory* factory)
+-    : buffers_(),
+-      factory_(factory) {
++GpuMemoryBufferTracker::GpuMemoryBufferTracker(GpuControl* gpu_control)
++    : gpu_control_(gpu_control) {
+ }
+ 
+ GpuMemoryBufferTracker::~GpuMemoryBufferTracker() {
+@@ -23,37 +21,33 @@ GpuMemoryBufferTracker::~GpuMemoryBufferTracker() {
+   }
+ }
+ 
+-GLuint GpuMemoryBufferTracker::CreateBuffer(
+-    GLsizei width, GLsizei height, GLenum internalformat) {
+-  GLuint image_id = 0;
+-  DCHECK(factory_);
+-  scoped_ptr<gfx::GpuMemoryBuffer> buffer =
+-      factory_->CreateGpuMemoryBuffer(width, height, internalformat, &image_id);
+-
+-  if (buffer.get() == NULL)
++int32 GpuMemoryBufferTracker::CreateBuffer(
++    size_t width, size_t height, int32 internalformat) {
++  int32 image_id = 0;
++  DCHECK(gpu_control_);
++  gfx::GpuMemoryBuffer* buffer = gpu_control_->CreateGpuMemoryBuffer(
++      width, height, internalformat, &image_id);
++  if (!buffer)
+     return 0;
+ 
+   std::pair<BufferMap::iterator, bool> result =
+-      buffers_.insert(std::make_pair(image_id, buffer.release()));
++      buffers_.insert(std::make_pair(image_id, buffer));
+   GPU_DCHECK(result.second);
+ 
+   return image_id;
+ }
+ 
+-gfx::GpuMemoryBuffer* GpuMemoryBufferTracker::GetBuffer(GLuint image_id) {
++gfx::GpuMemoryBuffer* GpuMemoryBufferTracker::GetBuffer(int32 image_id) {
+   BufferMap::iterator it = buffers_.find(image_id);
+   return (it != buffers_.end()) ? it->second : NULL;
+ }
+ 
+-void GpuMemoryBufferTracker::RemoveBuffer(GLuint image_id) {
++void GpuMemoryBufferTracker::RemoveBuffer(int32 image_id) {
+   BufferMap::iterator buffer_it = buffers_.find(image_id);
+-  if (buffer_it != buffers_.end()) {
+-    gfx::GpuMemoryBuffer* buffer = buffer_it->second;
++  if (buffer_it != buffers_.end())
+     buffers_.erase(buffer_it);
+-    delete buffer;
+-  }
+-  DCHECK(factory_);
+-  factory_->DeleteGpuMemoryBuffer(image_id);
++  DCHECK(gpu_control_);
++  gpu_control_->DestroyGpuMemoryBuffer(image_id);
+ }
+ 
+ }  // namespace gles2
+diff --git a/gpu/command_buffer/client/gpu_memory_buffer_tracker.h b/gpu/command_buffer/client/gpu_memory_buffer_tracker.h
+index 1192b17..0b07dd0 100644
+--- a/gpu/command_buffer/client/gpu_memory_buffer_tracker.h
++++ b/gpu/command_buffer/client/gpu_memory_buffer_tracker.h
+@@ -5,8 +5,6 @@
+ #ifndef GPU_COMMAND_BUFFER_CLIENT_GPU_MEMORY_BUFFER_TRACKER_H_
+ #define GPU_COMMAND_BUFFER_CLIENT_GPU_MEMORY_BUFFER_TRACKER_H_
+ 
+-#include <GLES2/gl2.h>
+-
+ #include "base/basictypes.h"
+ #include "gles2_impl_export.h"
+ #include "gpu/command_buffer/client/hash_tables.h"
+@@ -16,25 +14,24 @@ class GpuMemoryBuffer;
+ }
+ 
+ namespace gpu {
++class GpuControl;
++
+ namespace gles2 {
+-class ImageFactory;
+ 
+ // Tracks GPU memory buffer objects on the client side.
+ class GLES2_IMPL_EXPORT GpuMemoryBufferTracker {
+  public:
+-  // Ownership of |factory| remains with caller.
+-  explicit GpuMemoryBufferTracker(ImageFactory* factory);
++  explicit GpuMemoryBufferTracker(GpuControl* gpu_control);
+   virtual ~GpuMemoryBufferTracker();
+ 
+-  GLuint CreateBuffer(
+-      GLsizei width, GLsizei height, GLenum internalformat);
+-  gfx::GpuMemoryBuffer* GetBuffer(GLuint image_id);
+-  void RemoveBuffer(GLuint image_id);
++  int32 CreateBuffer(size_t width, size_t height, int32 internalformat);
++  gfx::GpuMemoryBuffer* GetBuffer(int32 image_id);
++  void RemoveBuffer(int32 image_id);
+ 
+  private:
+-  typedef gpu::hash_map<GLuint, gfx::GpuMemoryBuffer*> BufferMap;
++  typedef gpu::hash_map<int32, gfx::GpuMemoryBuffer*> BufferMap;
+   BufferMap buffers_;
+-  ImageFactory* factory_;
++  GpuControl* gpu_control_;
+ 
+   DISALLOW_COPY_AND_ASSIGN(GpuMemoryBufferTracker);
+ };
+diff --git a/gpu/command_buffer/client/image_factory.h b/gpu/command_buffer/client/image_factory.h
+deleted file mode 100644
+index 449c8a4..0000000
+--- a/gpu/command_buffer/client/image_factory.h
++++ /dev/null
+@@ -1,35 +0,0 @@
+-// Copyright 2013 The Chromium Authors. All rights reserved.
+-// Use of this source code is governed by a BSD-style license that can be
+-// found in the LICENSE file.
+-
+-#ifndef GPU_COMMAND_BUFFER_CLIENT_IMAGE_FACTORY_H_
+-#define GPU_COMMAND_BUFFER_CLIENT_IMAGE_FACTORY_H_
+-
+-#include <GLES2/gl2.h>
+-
+-#include "base/memory/scoped_ptr.h"
+-#include "gles2_impl_export.h"
+-
+-namespace gfx {
+-class GpuMemoryBuffer;
+-}
+-
+-namespace gpu {
+-namespace gles2 {
+-
+-class GLES2_IMPL_EXPORT ImageFactory {
+-
+- public:
+-  virtual ~ImageFactory() {}
+-
+-  // Create a GpuMemoryBuffer and makes it available to the
+-  // service side by inserting it to the ImageManager.
+-  virtual scoped_ptr<gfx::GpuMemoryBuffer> CreateGpuMemoryBuffer(
+-      int width, int height, GLenum internalformat, unsigned* image_id) = 0;
+-  virtual void DeleteGpuMemoryBuffer(unsigned image_id) = 0;
+-};
+-
+-}  // namespace gles2
+-}  // namespace gpu
+-
+-#endif  // GPU_COMMAND_BUFFER_CLIENT_IMAGE_FACTORY_H_
+diff --git a/gpu/command_buffer/common/gles2_cmd_format.h b/gpu/command_buffer/common/gles2_cmd_format.h
+index 37c7a53..76bb3fe 100644
+--- a/gpu/command_buffer/common/gles2_cmd_format.h
++++ b/gpu/command_buffer/common/gles2_cmd_format.h
+@@ -56,7 +56,6 @@ enum IdNamespaces {
+   kTextures,
+   kQueries,
+   kVertexArrays,
+-  kImages,
+   kNumIdNamespaces
+ };
+ 
+diff --git a/gpu/command_buffer/common/gpu_control.h b/gpu/command_buffer/common/gpu_control.h
+new file mode 100644
+index 0000000..1b40b2e
+--- /dev/null
++++ b/gpu/command_buffer/common/gpu_control.h
+@@ -0,0 +1,39 @@
++// Copyright (c) 2013 The Chromium Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef GPU_COMMAND_BUFFER_COMMON_GPU_CONTROL_H_
++#define GPU_COMMAND_BUFFER_COMMON_GPU_CONTROL_H_
++
++#include "gpu/gpu_export.h"
++
++namespace gfx {
++class GpuMemoryBuffer;
++}
++
++namespace gpu {
++
++// Common interface for GpuControl implementations.
++class GPU_EXPORT GpuControl {
++ public:
++  GpuControl() {}
++  virtual ~GpuControl() {}
++
++  // Create a gpu memory buffer of the given dimensions and format. Returns
++  // its ID or -1 on error.
++  virtual gfx::GpuMemoryBuffer* CreateGpuMemoryBuffer(
++      size_t width,
++      size_t height,
++      unsigned internalformat,
++      int32* id) = 0;
++
++  // Destroy a gpu memory buffer. The ID must be positive.
++  virtual void DestroyGpuMemoryBuffer(int32 id) = 0;
++
++ private:
++  DISALLOW_COPY_AND_ASSIGN(GpuControl);
++};
++
++}  // namespace gpu
++
++#endif  // GPU_COMMAND_BUFFER_COMMON_GPU_CONTROL_H_
+diff --git a/gpu/command_buffer/service/context_group.cc b/gpu/command_buffer/service/context_group.cc
+index 0cf991a..90932fb 100644
+--- a/gpu/command_buffer/service/context_group.cc
++++ b/gpu/command_buffer/service/context_group.cc
+@@ -67,7 +67,6 @@ ContextGroup::ContextGroup(
+   id_namespaces_[id_namespaces::kTextures].reset(new IdAllocator);
+   id_namespaces_[id_namespaces::kQueries].reset(new IdAllocator);
+   id_namespaces_[id_namespaces::kVertexArrays].reset(new IdAllocator);
+-  id_namespaces_[id_namespaces::kImages].reset(new IdAllocator);
+ }
+ 
+ static void GetIntegerv(GLenum pname, uint32* var) {
+diff --git a/gpu/command_buffer/service/gpu_control_service.cc b/gpu/command_buffer/service/gpu_control_service.cc
+new file mode 100644
+index 0000000..974dd36
+--- /dev/null
++++ b/gpu/command_buffer/service/gpu_control_service.cc
+@@ -0,0 +1,74 @@
++// Copyright (c) 2013 The Chromium Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "gpu/command_buffer/service/gpu_control_service.h"
++
++#include "gpu/command_buffer/client/gpu_memory_buffer_factory.h"
++#include "gpu/command_buffer/service/gpu_memory_buffer_manager.h"
++
++namespace gpu {
++
++GpuControlService::GpuControlService(
++    GpuMemoryBufferManagerInterface* gpu_memory_buffer_manager,
++    GpuMemoryBufferFactory* gpu_memory_buffer_factory)
++    : gpu_memory_buffer_manager_(gpu_memory_buffer_manager),
++      gpu_memory_buffer_factory_(gpu_memory_buffer_factory) {
++}
++
++GpuControlService::~GpuControlService() {
++}
++
++gfx::GpuMemoryBuffer* GpuControlService::CreateGpuMemoryBuffer(
++    size_t width,
++    size_t height,
++    unsigned internalformat,
++    int32* id) {
++  *id = -1;
++
++  CHECK(gpu_memory_buffer_factory_) << "No GPU memory buffer factory provided";
++  linked_ptr<gfx::GpuMemoryBuffer> buffer = make_linked_ptr(
++      gpu_memory_buffer_factory_->CreateGpuMemoryBuffer(width,
++                                                        height,
++                                                        internalformat));
++  if (!buffer.get())
++    return NULL;
++
++  static int32 next_id = 1;
++  *id = next_id++;
++
++  if (!RegisterGpuMemoryBuffer(*id,
++                               buffer->GetHandle(),
++                               width,
++                               height,
++                               internalformat)) {
++    *id = -1;
++    return NULL;
++  }
++
++  gpu_memory_buffers_[*id] = buffer;
++  return buffer.get();
++}
++
++void GpuControlService::DestroyGpuMemoryBuffer(int32 id) {
++  GpuMemoryBufferMap::iterator it = gpu_memory_buffers_.find(id);
++  if (it != gpu_memory_buffers_.end())
++    gpu_memory_buffers_.erase(it);
++
++  gpu_memory_buffer_manager_->DestroyGpuMemoryBuffer(id);
++}
++
++bool GpuControlService::RegisterGpuMemoryBuffer(
++    int32 id,
++    gfx::GpuMemoryBufferHandle buffer,
++    size_t width,
++    size_t height,
++    unsigned internalformat) {
++  return gpu_memory_buffer_manager_->RegisterGpuMemoryBuffer(id,
++                                                             buffer,
++                                                             width,
++                                                             height,
++                                                             internalformat);
++}
++
++}  // namespace gpu
+diff --git a/gpu/command_buffer/service/gpu_control_service.h b/gpu/command_buffer/service/gpu_control_service.h
+new file mode 100644
+index 0000000..8ca5770
+--- /dev/null
++++ b/gpu/command_buffer/service/gpu_control_service.h
+@@ -0,0 +1,51 @@
++// Copyright (c) 2013 The Chromium Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef GPU_COMMAND_BUFFER_SERVICE_GPU_CONTROL_SERVICE_H_
++#define GPU_COMMAND_BUFFER_SERVICE_GPU_CONTROL_SERVICE_H_
++
++#include <map>
++
++#include "base/memory/linked_ptr.h"
++#include "gpu/command_buffer/common/gpu_control.h"
++#include "ui/gfx/gpu_memory_buffer.h"
++
++namespace gpu {
++class GpuMemoryBufferFactory;
++class GpuMemoryBufferManagerInterface;
++
++class GPU_EXPORT GpuControlService : public GpuControl {
++ public:
++  GpuControlService(GpuMemoryBufferManagerInterface* gpu_memory_buffer_manager,
++                    GpuMemoryBufferFactory* gpu_memory_buffer_factory);
++  virtual ~GpuControlService();
++
++  // Overridden from GpuControl:
++  virtual gfx::GpuMemoryBuffer* CreateGpuMemoryBuffer(
++      size_t width,
++      size_t height,
++      unsigned internalformat,
++      int32* id) OVERRIDE;
++  virtual void DestroyGpuMemoryBuffer(int32 id) OVERRIDE;
++
++  // Register an existing gpu memory buffer and get an ID that can be used
++  // to identify it in the command buffer.
++  bool RegisterGpuMemoryBuffer(int32 id,
++                               gfx::GpuMemoryBufferHandle buffer,
++                               size_t width,
++                               size_t height,
++                               unsigned internalformat);
++
++ private:
++  GpuMemoryBufferManagerInterface* gpu_memory_buffer_manager_;
++  GpuMemoryBufferFactory* gpu_memory_buffer_factory_;
++  typedef std::map<int32, linked_ptr<gfx::GpuMemoryBuffer> > GpuMemoryBufferMap;
++  GpuMemoryBufferMap gpu_memory_buffers_;
++
++  DISALLOW_COPY_AND_ASSIGN(GpuControlService);
++};
++
++}  // namespace gpu
++
++#endif  // GPU_COMMAND_BUFFER_SERVICE_GPU_CONTROL_SERVICE_H_
+diff --git a/gpu/command_buffer/service/gpu_memory_buffer_manager.h b/gpu/command_buffer/service/gpu_memory_buffer_manager.h
+new file mode 100644
+index 0000000..c1343bc
+--- /dev/null
++++ b/gpu/command_buffer/service/gpu_memory_buffer_manager.h
+@@ -0,0 +1,28 @@
++// Copyright (c) 2013 The Chromium Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef GPU_COMMAND_BUFFER_SERVICE_GPU_MEMORY_BUFFER_MANAGER_H_
++#define GPU_COMMAND_BUFFER_SERVICE_GPU_MEMORY_BUFFER_MANAGER_H_
++
++#include "base/basictypes.h"
++#include "gpu/gpu_export.h"
++#include "ui/gfx/gpu_memory_buffer.h"
++
++namespace gpu {
++
++class GPU_EXPORT GpuMemoryBufferManagerInterface {
++ public:
++  virtual ~GpuMemoryBufferManagerInterface() {}
++
++  virtual bool RegisterGpuMemoryBuffer(int32 id,
++                                       gfx::GpuMemoryBufferHandle buffer,
++                                       size_t width,
++                                       size_t height,
++                                       unsigned internalformat) = 0;
++  virtual void DestroyGpuMemoryBuffer(int32 id) = 0;
++};
++
++}  // namespace gpu
++
++#endif  // GPU_COMMAND_BUFFER_SERVICE_GPU_MEMORY_BUFFER_MANAGER_H_
+diff --git a/gpu/command_buffer/service/image_manager.cc b/gpu/command_buffer/service/image_manager.cc
+index 6be4e66..a09af15 100644
+--- a/gpu/command_buffer/service/image_manager.cc
++++ b/gpu/command_buffer/service/image_manager.cc
+@@ -15,6 +15,36 @@ ImageManager::ImageManager() {
+ ImageManager::~ImageManager() {
+ }
+ 
++bool ImageManager::RegisterGpuMemoryBuffer(int32 id,
++                                           gfx::GpuMemoryBufferHandle buffer,
++                                           size_t width,
++                                           size_t height,
++                                           unsigned internalformat) {
++  if (id <= 0) {
++    DVLOG(0) << "Cannot register GPU memory buffer with non-positive ID.";
++    return false;
++  }
++
++  if (LookupImage(id)) {
++    DVLOG(0) << "GPU memory buffer ID already in use.";
++    return false;
++  }
++
++  scoped_refptr<gfx::GLImage> gl_image =
++      gfx::GLImage::CreateGLImageForGpuMemoryBuffer(buffer,
++                                                    gfx::Size(width, height),
++                                                    internalformat);
++  if (!gl_image)
++    return false;
++
++  AddImage(gl_image.get(), id);
++  return true;
++}
++
++void ImageManager::DestroyGpuMemoryBuffer(int32 id) {
++  RemoveImage(id);
++}
++
+ void ImageManager::AddImage(gfx::GLImage* image, int32 service_id) {
+   gl_images_[service_id] = image;
+ }
+diff --git a/gpu/command_buffer/service/image_manager.h b/gpu/command_buffer/service/image_manager.h
+index 1b42146..a125ae8 100644
+--- a/gpu/command_buffer/service/image_manager.h
++++ b/gpu/command_buffer/service/image_manager.h
+@@ -8,6 +8,7 @@
+ #include "base/basictypes.h"
+ #include "base/containers/hash_tables.h"
+ #include "base/memory/ref_counted.h"
++#include "gpu/command_buffer/service/gpu_memory_buffer_manager.h"
+ #include "gpu/gpu_export.h"
+ 
+ namespace gfx {
+@@ -18,10 +19,20 @@ namespace gpu {
+ namespace gles2 {
+ 
+ // Interface used by the cmd decoder to lookup images.
+-class GPU_EXPORT ImageManager : public base::RefCounted<ImageManager> {
++class GPU_EXPORT ImageManager
++    : public GpuMemoryBufferManagerInterface,
++      public base::RefCounted<ImageManager> {
+  public:
+   ImageManager();
+ 
++  // Overridden from GpuMemoryBufferManagerInterface:
++  virtual bool RegisterGpuMemoryBuffer(int32 id,
++                                       gfx::GpuMemoryBufferHandle buffer,
++                                       size_t width,
++                                       size_t height,
++                                       unsigned internalformat) OVERRIDE;
++  virtual void DestroyGpuMemoryBuffer(int32 id) OVERRIDE;
++
+   void AddImage(gfx::GLImage* gl_image, int32 service_id);
+   void RemoveImage(int32 service_id);
+   gfx::GLImage* LookupImage(int32 service_id);
+@@ -29,7 +40,7 @@ class GPU_EXPORT ImageManager : public base::RefCounted<ImageManager> {
+  private:
+   friend class base::RefCounted<ImageManager>;
+ 
+-  ~ImageManager();
++  virtual ~ImageManager();
+ 
+   typedef base::hash_map<uint32, scoped_refptr<gfx::GLImage> > GLImageMap;
+   GLImageMap gl_images_;
+diff --git a/gpu/command_buffer/service/in_process_command_buffer.cc b/gpu/command_buffer/service/in_process_command_buffer.cc
+index 460065e..6b9fe8a 100644
+--- a/gpu/command_buffer/service/in_process_command_buffer.cc
++++ b/gpu/command_buffer/service/in_process_command_buffer.cc
+@@ -22,10 +22,10 @@
+ #include "base/message_loop/message_loop_proxy.h"
+ #include "base/sequence_checker.h"
+ #include "base/threading/thread.h"
+-#include "gpu/command_buffer/common/id_allocator.h"
+ #include "gpu/command_buffer/service/command_buffer_service.h"
+ #include "gpu/command_buffer/service/context_group.h"
+ #include "gpu/command_buffer/service/gl_context_virtual.h"
++#include "gpu/command_buffer/service/gpu_control_service.h"
+ #include "gpu/command_buffer/service/gpu_scheduler.h"
+ #include "gpu/command_buffer/service/image_manager.h"
+ #include "gpu/command_buffer/service/transfer_buffer_manager.h"
+@@ -48,6 +48,7 @@ static base::LazyInstance<std::set<InProcessCommandBuffer*> >
+ 
+ static bool g_use_virtualized_gl_context = false;
+ static bool g_uses_explicit_scheduling = false;
++static GpuMemoryBufferFactory* g_gpu_memory_buffer_factory = NULL;
+ 
+ template <typename T>
+ static void RunTaskWithResult(base::Callback<T(void)> task,
+@@ -405,6 +406,10 @@ bool InProcessCommandBuffer::InitializeOnGpuThread(
+       &GpuScheduler::SetGetBuffer, base::Unretained(gpu_scheduler_.get())));
+   command_buffer_ = command_buffer.Pass();
+ 
++  gpu_control_.reset(
++      new GpuControlService(decoder_->GetContextGroup()->image_manager(),
++                            g_gpu_memory_buffer_factory));
++
+   decoder_->set_engine(gpu_scheduler_.get());
+ 
+   if (!surface_) {
+@@ -511,55 +516,6 @@ void InProcessCommandBuffer::CheckSequencedThread() {
+          sequence_checker_->CalledOnValidSequencedThread());
+ }
+ 
+-unsigned int InProcessCommandBuffer::CreateImageForGpuMemoryBuffer(
+-    gfx::GpuMemoryBufferHandle buffer,
+-    gfx::Size size) {
+-  CheckSequencedThread();
+-  unsigned int image_id;
+-  {
+-    // TODO: ID allocation should go through CommandBuffer
+-    base::AutoLock lock(command_buffer_lock_);
+-    gles2::ContextGroup* group = decoder_->GetContextGroup();
+-    image_id =
+-        group->GetIdAllocator(gles2::id_namespaces::kImages)->AllocateID();
+-  }
+-  base::Closure image_task =
+-      base::Bind(&InProcessCommandBuffer::CreateImageOnGpuThread,
+-                 base::Unretained(this), buffer, size, image_id);
+-  QueueTask(image_task);
+-  return image_id;
+-}
+-
+-void InProcessCommandBuffer::CreateImageOnGpuThread(
+-    gfx::GpuMemoryBufferHandle buffer,
+-    gfx::Size size,
+-    unsigned int image_id) {
+-  CheckSequencedThread();
+-  scoped_refptr<gfx::GLImage> gl_image =
+-      gfx::GLImage::CreateGLImageForGpuMemoryBuffer(buffer, size);
+-   decoder_->GetContextGroup()->image_manager()->AddImage(gl_image, image_id);
+-}
+-
+-void InProcessCommandBuffer::RemoveImage(unsigned int image_id) {
+-  CheckSequencedThread();
+-  {
+-    // TODO: ID allocation should go through CommandBuffer
+-    base::AutoLock lock(command_buffer_lock_);
+-    gles2::ContextGroup* group = decoder_->GetContextGroup();
+-    group->GetIdAllocator(gles2::id_namespaces::kImages)->FreeID(image_id);
+-  }
+-  base::Closure image_manager_task =
+-      base::Bind(&InProcessCommandBuffer::RemoveImageOnGpuThread,
+-                 base::Unretained(this),
+-                 image_id);
+-  QueueTask(image_manager_task);
+-}
+-
+-void InProcessCommandBuffer::RemoveImageOnGpuThread(unsigned int image_id) {
+-  CheckSequencedThread();
+-  decoder_->GetContextGroup()->image_manager()->RemoveImage(image_id);
+-}
+-
+ void InProcessCommandBuffer::OnContextLost() {
+   CheckSequencedThread();
+   if (!context_lost_callback_.is_null()) {
+@@ -695,6 +651,28 @@ void InProcessCommandBuffer::SignalSyncPoint(unsigned sync_point,
+   QueueTask(WrapCallback(callback));
+ }
+ 
++gfx::GpuMemoryBuffer* InProcessCommandBuffer::CreateGpuMemoryBuffer(
++    size_t width,
++    size_t height,
++    unsigned internalformat,
++    int32* id) {
++  CheckSequencedThread();
++  base::AutoLock lock(command_buffer_lock_);
++  return gpu_control_->CreateGpuMemoryBuffer(width,
++                                             height,
++                                             internalformat,
++                                             id);
++}
++
++void InProcessCommandBuffer::DestroyGpuMemoryBuffer(int32 id) {
++  CheckSequencedThread();
++  base::Closure task = base::Bind(&GpuControl::DestroyGpuMemoryBuffer,
++                                  base::Unretained(gpu_control_.get()),
++                                  id);
++
++  QueueTask(task);
++}
++
+ gpu::error::Error InProcessCommandBuffer::GetLastError() {
+   CheckSequencedThread();
+   return last_state_.error;
+@@ -776,4 +754,10 @@ void InProcessCommandBuffer::ProcessGpuWorkOnCurrentThread() {
+   g_gpu_queue.Get().RunTasks();
+ }
+ 
++// static
++void InProcessCommandBuffer::SetGpuMemoryBufferFactory(
++    GpuMemoryBufferFactory* factory) {
++  g_gpu_memory_buffer_factory = factory;
++}
++
+ }  // namespace gpu
+diff --git a/gpu/command_buffer/service/in_process_command_buffer.h b/gpu/command_buffer/service/in_process_command_buffer.h
+index e36bfbd..3caf4aa 100644
+--- a/gpu/command_buffer/service/in_process_command_buffer.h
++++ b/gpu/command_buffer/service/in_process_command_buffer.h
+@@ -14,6 +14,7 @@
+ #include "base/synchronization/lock.h"
+ #include "base/synchronization/waitable_event.h"
+ #include "gpu/command_buffer/common/command_buffer.h"
++#include "gpu/command_buffer/common/gpu_control.h"
+ #include "gpu/gpu_export.h"
+ #include "ui/gfx/gpu_memory_buffer.h"
+ #include "ui/gfx/native_widget_types.h"
+@@ -26,7 +27,6 @@ class SequenceChecker;
+ 
+ namespace gfx {
+ class GLContext;
+-class GLImage;
+ class GLSurface;
+ class Size;
+ }
+@@ -46,6 +46,7 @@ namespace gles2 {
+ class GLES2Decoder;
+ }
+ 
++class GpuMemoryBufferFactory;
+ class GpuScheduler;
+ class TransferBufferManagerInterface;
+ 
+@@ -53,7 +54,8 @@ class TransferBufferManagerInterface;
+ // example GPU thread) when being run in single process mode.
+ // However, the behavior for accessing one context (i.e. one instance of this
+ // class) from different client threads is undefined.
+-class GPU_EXPORT InProcessCommandBuffer : public CommandBuffer {
++class GPU_EXPORT InProcessCommandBuffer : public CommandBuffer,
++                                          public GpuControl {
+  public:
+   InProcessCommandBuffer();
+   virtual ~InProcessCommandBuffer();
+@@ -70,6 +72,7 @@ class GPU_EXPORT InProcessCommandBuffer : public CommandBuffer {
+   static void ProcessGpuWorkOnCurrentThread();
+ 
+   static void EnableVirtualizedContext();
++  static void SetGpuMemoryBufferFactory(GpuMemoryBufferFactory* factory);
+ 
+   // If |surface| is not NULL, use it directly; in this case, the command
+   // buffer gpu thread must be the same as the client thread. Otherwise create
+@@ -87,10 +90,6 @@ class GPU_EXPORT InProcessCommandBuffer : public CommandBuffer {
+   void Destroy();
+   void SignalSyncPoint(unsigned sync_point,
+                        const base::Closure& callback);
+-  unsigned int CreateImageForGpuMemoryBuffer(
+-      gfx::GpuMemoryBufferHandle buffer,
+-      gfx::Size size);
+-  void RemoveImage(unsigned int image_id);
+ 
+   // CommandBuffer implementation:
+   virtual bool Initialize() OVERRIDE;
+@@ -111,6 +110,14 @@ class GPU_EXPORT InProcessCommandBuffer : public CommandBuffer {
+   virtual uint32 InsertSyncPoint() OVERRIDE;
+   virtual gpu::error::Error GetLastError() OVERRIDE;
+ 
++  // GpuControl implementation:
++  virtual gfx::GpuMemoryBuffer* CreateGpuMemoryBuffer(
++      size_t width,
++      size_t height,
++      unsigned internalformat,
++      int32* id) OVERRIDE;
++  virtual void DestroyGpuMemoryBuffer(int32 id) OVERRIDE;
++
+   // The serializer interface to the GPU service (i.e. thread).
+   class SchedulerClient {
+    public:
+@@ -132,10 +139,6 @@ class GPU_EXPORT InProcessCommandBuffer : public CommandBuffer {
+                              gfx::GpuPreference gpu_preference);
+   bool DestroyOnGpuThread();
+   void FlushOnGpuThread(int32 put_offset);
+-  void CreateImageOnGpuThread(gfx::GpuMemoryBufferHandle buffer,
+-                              gfx::Size size,
+-                              unsigned int image_id);
+-  void RemoveImageOnGpuThread(unsigned int image_id);
+   bool MakeCurrent();
+   bool IsContextLost();
+   base::Closure WrapCallback(const base::Closure& callback);
+@@ -172,6 +175,7 @@ class GPU_EXPORT InProcessCommandBuffer : public CommandBuffer {
+   scoped_ptr<SchedulerClient> queue_;
+   State state_after_last_flush_;
+   base::Lock state_after_last_flush_lock_;
++  scoped_ptr<GpuControl> gpu_control_;
+ 
+ #if defined(OS_ANDROID)
+   scoped_refptr<StreamTextureManagerInProcess> stream_texture_manager_;
+diff --git a/gpu/command_buffer/tests/gl_gpu_memory_buffer_unittests.cc b/gpu/command_buffer/tests/gl_gpu_memory_buffer_unittests.cc
+index 9c9d5ab..91fbc6a 100644
+--- a/gpu/command_buffer/tests/gl_gpu_memory_buffer_unittests.cc
++++ b/gpu/command_buffer/tests/gl_gpu_memory_buffer_unittests.cc
+@@ -11,6 +11,8 @@
+ #include "base/memory/ref_counted.h"
+ #include "base/process/process_handle.h"
+ #include "gpu/command_buffer/client/gles2_implementation.h"
++#include "gpu/command_buffer/client/gpu_memory_buffer_factory.h"
++#include "gpu/command_buffer/service/command_buffer_service.h"
+ #include "gpu/command_buffer/service/image_manager.h"
+ #include "gpu/command_buffer/tests/gl_manager.h"
+ #include "gpu/command_buffer/tests/gl_test_utils.h"
+@@ -51,24 +53,16 @@ class MockGpuMemoryBuffer : public gfx::GpuMemoryBuffer {
+   DISALLOW_COPY_AND_ASSIGN(MockGpuMemoryBuffer);
+ };
+ 
+-class MockImageFactory : public ImageFactory {
++class MockGpuMemoryBufferFactory : public GpuMemoryBufferFactory {
+  public:
+-  MockImageFactory(ImageManager* image_manager) {}
+-  virtual ~MockImageFactory() {}
+-
+-  MOCK_METHOD4(CreateGpuMemoryBufferMock, gfx::GpuMemoryBuffer*(
+-      int width, int height, GLenum internalformat, unsigned* image_id));
+-  MOCK_METHOD1(DeleteGpuMemoryBuffer, void(unsigned));
+-  // Workaround for mocking methods that return scoped_ptrs
+-  virtual scoped_ptr<gfx::GpuMemoryBuffer> CreateGpuMemoryBuffer(
+-      int width, int height, GLenum internalformat,
+-      unsigned* image_id) OVERRIDE {
+-    return scoped_ptr<gfx::GpuMemoryBuffer>(CreateGpuMemoryBufferMock(
+-        width, height, internalformat, image_id));
+-  }
++  MockGpuMemoryBufferFactory() {}
++  virtual ~MockGpuMemoryBufferFactory() {}
++
++  MOCK_METHOD3(CreateGpuMemoryBuffer,
++               gfx::GpuMemoryBuffer*(size_t, size_t, unsigned));
+ 
+  private:
+-  DISALLOW_COPY_AND_ASSIGN(MockImageFactory);
++  DISALLOW_COPY_AND_ASSIGN(MockGpuMemoryBufferFactory);
+ };
+ 
+ class MockGpuMemoryBufferTest : public testing::Test {
+@@ -76,10 +70,9 @@ class MockGpuMemoryBufferTest : public testing::Test {
+   virtual void SetUp() {
+     GLManager::Options options;
+     image_manager_ = new ImageManager;
+-    image_factory_.reset(
+-        new StrictMock<MockImageFactory>(image_manager_.get()));
++    gpu_memory_buffer_factory_.reset(new MockGpuMemoryBufferFactory);
+     options.image_manager = image_manager_.get();
+-    options.image_factory = image_factory_.get();
++    options.gpu_memory_buffer_factory = gpu_memory_buffer_factory_.get();
+ 
+     gl_.Initialize(options);
+     gl_.MakeCurrent();
+@@ -108,8 +101,8 @@ class MockGpuMemoryBufferTest : public testing::Test {
+     gl_.Destroy();
+   }
+ 
+-  scoped_ptr<StrictMock<MockImageFactory> > image_factory_;
+   scoped_refptr<ImageManager> image_manager_;
++  scoped_ptr<MockGpuMemoryBufferFactory> gpu_memory_buffer_factory_;
+   GLManager gl_;
+   GLuint texture_ids_[2];
+   GLuint framebuffer_id_;
+@@ -133,29 +126,21 @@ TEST_F(MockGpuMemoryBufferTest, Lifecycle) {
+   handle.type = gfx::SHARED_MEMORY_BUFFER;
+   handle.handle = duped_shared_memory_handle;
+ 
+-  const GLuint kImageId = 345u;
+-
+-  EXPECT_CALL(*image_factory_.get(), CreateGpuMemoryBufferMock(
+-      kImageWidth, kImageHeight, GL_RGBA8_OES, _))
++  EXPECT_CALL(*gpu_memory_buffer_factory_.get(), CreateGpuMemoryBuffer(
++      kImageWidth, kImageHeight, GL_RGBA8_OES))
+       .Times(1)
+-      .WillOnce(DoAll(SetArgPointee<3>(kImageId), Return(gpu_memory_buffer)))
++      .WillOnce(Return(gpu_memory_buffer))
+       .RetiresOnSaturation();
+-
+-  // Create the GLImage and insert it into the ImageManager, which
+-  // would be done within CreateGpuMemoryBufferMock if it weren't a mock.
+-  GLuint image_id = glCreateImageCHROMIUM(
+-      kImageWidth, kImageHeight, GL_RGBA8_OES);
+-  EXPECT_EQ(kImageId, image_id);
+-
+   EXPECT_CALL(*gpu_memory_buffer, GetHandle())
++      .Times(1)
+       .WillOnce(Return(handle))
+       .RetiresOnSaturation();
+ 
+-  gfx::Size size(kImageWidth, kImageHeight);
+-  scoped_refptr<gfx::GLImage> gl_image(
+-      gfx::GLImage::CreateGLImageForGpuMemoryBuffer(
+-          gpu_memory_buffer->GetHandle(), size));
+-  image_manager_->AddImage(gl_image.get(), image_id);
++  // Create the image. This should add the image ID to the ImageManager.
++  GLuint image_id = glCreateImageCHROMIUM(
++      kImageWidth, kImageHeight, GL_RGBA8_OES);
++  EXPECT_NE(0u, image_id);
++  EXPECT_TRUE(image_manager_->LookupImage(image_id) != NULL);
+ 
+   EXPECT_CALL(*gpu_memory_buffer, IsMapped())
+       .WillOnce(Return(false))
+@@ -217,11 +202,6 @@ TEST_F(MockGpuMemoryBufferTest, Lifecycle) {
+   EXPECT_CALL(*gpu_memory_buffer, Die())
+       .Times(1)
+       .RetiresOnSaturation();
+-
+-  EXPECT_CALL(*image_factory_.get(), DeleteGpuMemoryBuffer(image_id))
+-      .Times(1)
+-      .RetiresOnSaturation();
+-
+   glDestroyImageCHROMIUM(image_id);
+ }
+ 
+diff --git a/gpu/command_buffer/tests/gl_manager.cc b/gpu/command_buffer/tests/gl_manager.cc
+index c4b84a2..57bf674 100644
+--- a/gpu/command_buffer/tests/gl_manager.cc
++++ b/gpu/command_buffer/tests/gl_manager.cc
+@@ -16,6 +16,7 @@
+ #include "gpu/command_buffer/service/context_group.h"
+ #include "gpu/command_buffer/service/gl_context_virtual.h"
+ #include "gpu/command_buffer/service/gles2_cmd_decoder.h"
++#include "gpu/command_buffer/service/gpu_control_service.h"
+ #include "gpu/command_buffer/service/gpu_scheduler.h"
+ #include "gpu/command_buffer/service/image_manager.h"
+ #include "gpu/command_buffer/service/mailbox_manager.h"
+@@ -38,8 +39,7 @@ GLManager::Options::Options()
+       virtual_manager(NULL),
+       bind_generates_resource(false),
+       context_lost_allowed(false),
+-      image_manager(NULL),
+-      image_factory(NULL) {
++      image_manager(NULL) {
+ }
+ 
+ GLManager::GLManager()
+@@ -143,6 +143,10 @@ void GLManager::Initialize(const GLManager::Options& options) {
+   ASSERT_TRUE(command_buffer_->Initialize())
+       << "could not create command buffer service";
+ 
++  gpu_control_.reset(
++      new GpuControlService(decoder_->GetContextGroup()->image_manager(),
++                            options.gpu_memory_buffer_factory));
++
+   gpu_scheduler_.reset(new GpuScheduler(command_buffer_.get(),
+                                         decoder_.get(),
+                                         decoder_.get()));
+@@ -200,7 +204,7 @@ void GLManager::Initialize(const GLManager::Options& options) {
+       client_share_group,
+       transfer_buffer_.get(),
+       options.bind_generates_resource,
+-      options.image_factory));
++      gpu_control_.get()));
+ 
+   ASSERT_TRUE(gles2_implementation_->Initialize(
+       kStartTransferBufferSize,
+diff --git a/gpu/command_buffer/tests/gl_manager.h b/gpu/command_buffer/tests/gl_manager.h
+index a53aa40..8a811fd 100644
+--- a/gpu/command_buffer/tests/gl_manager.h
++++ b/gpu/command_buffer/tests/gl_manager.h
+@@ -21,8 +21,10 @@ class GLSurface;
+ namespace gpu {
+ 
+ class CommandBufferService;
+-class TransferBuffer;
++class GpuControlService;
++class GpuMemoryBufferFactory;
+ class GpuScheduler;
++class TransferBuffer;
+ 
+ namespace gles2 {
+ 
+@@ -55,8 +57,8 @@ class GLManager {
+     bool context_lost_allowed;
+     // Image manager to be used.
+     gles2::ImageManager* image_manager;
+-    // Image factory to be used.
+-    gles2::ImageFactory* image_factory;
++    // GpuMemoryBuffer factory to be used.
++    GpuMemoryBufferFactory* gpu_memory_buffer_factory;
+   };
+   GLManager();
+   ~GLManager();
+@@ -98,6 +100,7 @@ class GLManager {
+   scoped_refptr<gles2::MailboxManager> mailbox_manager_;
+   scoped_refptr<gfx::GLShareGroup> share_group_;
+   scoped_ptr<CommandBufferService> command_buffer_;
++  scoped_ptr<GpuControlService> gpu_control_;
+   scoped_ptr<gles2::GLES2Decoder> decoder_;
+   scoped_ptr<GpuScheduler> gpu_scheduler_;
+   scoped_refptr<gfx::GLSurface> surface_;
+diff --git a/gpu/command_buffer_common.gypi b/gpu/command_buffer_common.gypi
+index 85431e4..55e825e 100644
+--- a/gpu/command_buffer_common.gypi
++++ b/gpu/command_buffer_common.gypi
+@@ -21,6 +21,7 @@
+     'command_buffer/common/gles2_cmd_format_autogen.h',
+     'command_buffer/common/gles2_cmd_format.cc',
+     'command_buffer/common/gles2_cmd_format.h',
++    'command_buffer/common/gpu_control.h',
+     'command_buffer/common/id_allocator.cc',
+     'command_buffer/common/id_allocator.h',
+     'command_buffer/common/mailbox.cc',
+diff --git a/gpu/command_buffer_service.gypi b/gpu/command_buffer_service.gypi
+index fb75f78..9c9c3f7 100644
+--- a/gpu/command_buffer_service.gypi
++++ b/gpu/command_buffer_service.gypi
+@@ -75,13 +75,16 @@
+     'command_buffer/service/gl_state_restorer_impl.cc',
+     'command_buffer/service/gl_state_restorer_impl.h',
+     'command_buffer/service/gl_utils.h',
+-    'command_buffer/service/gpu_scheduler.h',
++    'command_buffer/service/gpu_control_service.cc',
++    'command_buffer/service/gpu_control_service.h',
++    'command_buffer/service/gpu_memory_buffer_manager.h',
+     'command_buffer/service/gpu_scheduler.cc',
++    'command_buffer/service/gpu_scheduler.h',
+     'command_buffer/service/gpu_scheduler_mock.h',
+-    'command_buffer/service/gpu_switches.h',
+     'command_buffer/service/gpu_switches.cc',
+-    'command_buffer/service/gpu_tracer.h',
++    'command_buffer/service/gpu_switches.h',
+     'command_buffer/service/gpu_tracer.cc',
++    'command_buffer/service/gpu_tracer.h',
+     'command_buffer/service/id_manager.h',
+     'command_buffer/service/id_manager.cc',
+     'command_buffer/service/image_manager.cc',
+diff --git a/gpu/command_buffer_service.target.darwin-arm.mk b/gpu/command_buffer_service.target.darwin-arm.mk
+index 3e46f92..7e0b074 100644
+--- a/gpu/command_buffer_service.target.darwin-arm.mk
++++ b/gpu/command_buffer_service.target.darwin-arm.mk
+@@ -48,6 +48,7 @@ LOCAL_SRC_FILES := \
+ 	gpu/command_buffer/service/gles2_cmd_validation.cc \
+ 	gpu/command_buffer/service/gl_context_virtual.cc \
+ 	gpu/command_buffer/service/gl_state_restorer_impl.cc \
++	gpu/command_buffer/service/gpu_control_service.cc \
+ 	gpu/command_buffer/service/gpu_scheduler.cc \
+ 	gpu/command_buffer/service/gpu_switches.cc \
+ 	gpu/command_buffer/service/gpu_tracer.cc \
+diff --git a/gpu/command_buffer_service.target.darwin-mips.mk b/gpu/command_buffer_service.target.darwin-mips.mk
+index daf6d93..dcdb6e3 100644
+--- a/gpu/command_buffer_service.target.darwin-mips.mk
++++ b/gpu/command_buffer_service.target.darwin-mips.mk
+@@ -48,6 +48,7 @@ LOCAL_SRC_FILES := \
+ 	gpu/command_buffer/service/gles2_cmd_validation.cc \
+ 	gpu/command_buffer/service/gl_context_virtual.cc \
+ 	gpu/command_buffer/service/gl_state_restorer_impl.cc \
++	gpu/command_buffer/service/gpu_control_service.cc \
+ 	gpu/command_buffer/service/gpu_scheduler.cc \
+ 	gpu/command_buffer/service/gpu_switches.cc \
+ 	gpu/command_buffer/service/gpu_tracer.cc \
+diff --git a/gpu/command_buffer_service.target.darwin-x86.mk b/gpu/command_buffer_service.target.darwin-x86.mk
+index ec5bc48..eea3609 100644
+--- a/gpu/command_buffer_service.target.darwin-x86.mk
++++ b/gpu/command_buffer_service.target.darwin-x86.mk
+@@ -48,6 +48,7 @@ LOCAL_SRC_FILES := \
+ 	gpu/command_buffer/service/gles2_cmd_validation.cc \
+ 	gpu/command_buffer/service/gl_context_virtual.cc \
+ 	gpu/command_buffer/service/gl_state_restorer_impl.cc \
++	gpu/command_buffer/service/gpu_control_service.cc \
+ 	gpu/command_buffer/service/gpu_scheduler.cc \
+ 	gpu/command_buffer/service/gpu_switches.cc \
+ 	gpu/command_buffer/service/gpu_tracer.cc \
+diff --git a/gpu/command_buffer_service.target.linux-arm.mk b/gpu/command_buffer_service.target.linux-arm.mk
+index 3e46f92..7e0b074 100644
+--- a/gpu/command_buffer_service.target.linux-arm.mk
++++ b/gpu/command_buffer_service.target.linux-arm.mk
+@@ -48,6 +48,7 @@ LOCAL_SRC_FILES := \
+ 	gpu/command_buffer/service/gles2_cmd_validation.cc \
+ 	gpu/command_buffer/service/gl_context_virtual.cc \
+ 	gpu/command_buffer/service/gl_state_restorer_impl.cc \
++	gpu/command_buffer/service/gpu_control_service.cc \
+ 	gpu/command_buffer/service/gpu_scheduler.cc \
+ 	gpu/command_buffer/service/gpu_switches.cc \
+ 	gpu/command_buffer/service/gpu_tracer.cc \
+diff --git a/gpu/command_buffer_service.target.linux-mips.mk b/gpu/command_buffer_service.target.linux-mips.mk
+index daf6d93..dcdb6e3 100644
+--- a/gpu/command_buffer_service.target.linux-mips.mk
++++ b/gpu/command_buffer_service.target.linux-mips.mk
+@@ -48,6 +48,7 @@ LOCAL_SRC_FILES := \
+ 	gpu/command_buffer/service/gles2_cmd_validation.cc \
+ 	gpu/command_buffer/service/gl_context_virtual.cc \
+ 	gpu/command_buffer/service/gl_state_restorer_impl.cc \
++	gpu/command_buffer/service/gpu_control_service.cc \
+ 	gpu/command_buffer/service/gpu_scheduler.cc \
+ 	gpu/command_buffer/service/gpu_switches.cc \
+ 	gpu/command_buffer/service/gpu_tracer.cc \
+diff --git a/gpu/command_buffer_service.target.linux-x86.mk b/gpu/command_buffer_service.target.linux-x86.mk
+index ec5bc48..eea3609 100644
+--- a/gpu/command_buffer_service.target.linux-x86.mk
++++ b/gpu/command_buffer_service.target.linux-x86.mk
+@@ -48,6 +48,7 @@ LOCAL_SRC_FILES := \
+ 	gpu/command_buffer/service/gles2_cmd_validation.cc \
+ 	gpu/command_buffer/service/gl_context_virtual.cc \
+ 	gpu/command_buffer/service/gl_state_restorer_impl.cc \
++	gpu/command_buffer/service/gpu_control_service.cc \
+ 	gpu/command_buffer/service/gpu_scheduler.cc \
+ 	gpu/command_buffer/service/gpu_switches.cc \
+ 	gpu/command_buffer/service/gpu_tracer.cc \
+diff --git a/gpu/gpu_common.gypi b/gpu/gpu_common.gypi
+index da2be68..015d9c6 100644
+--- a/gpu/gpu_common.gypi
++++ b/gpu/gpu_common.gypi
+@@ -39,7 +39,6 @@
+       'command_buffer/client/gpu_memory_buffer_factory.h',
+       'command_buffer/client/gpu_memory_buffer_tracker.cc',
+       'command_buffer/client/gpu_memory_buffer_tracker.h',
+-      'command_buffer/client/image_factory.h',
+       'command_buffer/client/program_info_manager.cc',
+       'command_buffer/client/program_info_manager.h',
+       'command_buffer/client/query_tracker.cc',
+diff --git a/ui/gl/gl_image.h b/ui/gl/gl_image.h
+index f1d0537..8d59bc4 100644
+--- a/ui/gl/gl_image.h
++++ b/ui/gl/gl_image.h
+@@ -38,7 +38,9 @@ class GL_EXPORT GLImage : public base::RefCounted<GLImage> {
+ 
+   // Create a GL image for a GPU Memory buffer.
+   static scoped_refptr<GLImage> CreateGLImageForGpuMemoryBuffer(
+-      gfx::GpuMemoryBufferHandle buffer, gfx::Size size);
++      gfx::GpuMemoryBufferHandle buffer,
++      gfx::Size size,
++      unsigned internalformat);
+ 
+  protected:
+   virtual ~GLImage();
+diff --git a/ui/gl/gl_image_android.cc b/ui/gl/gl_image_android.cc
+index fe871e7..e56dc2d 100644
+--- a/ui/gl/gl_image_android.cc
++++ b/ui/gl/gl_image_android.cc
+@@ -26,13 +26,16 @@ scoped_refptr<GLImage> GLImage::CreateGLImage(gfx::PluginWindowHandle window) {
+ }
+ 
+ scoped_refptr<GLImage> GLImage::CreateGLImageForGpuMemoryBuffer(
+-    gfx::GpuMemoryBufferHandle buffer, gfx::Size size) {
++    gfx::GpuMemoryBufferHandle buffer,
++    gfx::Size size,
++    unsigned internalformat) {
+   TRACE_EVENT0("gpu", "GLImage::CreateGLImageForGpuMemoryBuffer");
+   switch (GetGLImplementation()) {
+     case kGLImplementationEGLGLES2:
+       switch (buffer.type) {
+         case SHARED_MEMORY_BUFFER: {
+-          scoped_refptr<GLImageShm> image(new GLImageShm(size));
++          scoped_refptr<GLImageShm> image(
++              new GLImageShm(size, internalformat));
+           if (!image->Initialize(buffer))
+             return NULL;
+ 
+diff --git a/ui/gl/gl_image_mac.cc b/ui/gl/gl_image_mac.cc
+index b244a22..04dc61e 100644
+--- a/ui/gl/gl_image_mac.cc
++++ b/ui/gl/gl_image_mac.cc
+@@ -27,7 +27,9 @@ scoped_refptr<GLImage> GLImage::CreateGLImage(gfx::PluginWindowHandle window) {
+ }
+ 
+ scoped_refptr<GLImage> GLImage::CreateGLImageForGpuMemoryBuffer(
+-    gfx::GpuMemoryBufferHandle buffer, gfx::Size size) {
++    gfx::GpuMemoryBufferHandle buffer,
++    gfx::Size size,
++    unsigned internalformat) {
+   TRACE_EVENT0("gpu", "GLImage::CreateGLImageForGpuMemoryBuffer");
+   switch (GetGLImplementation()) {
+     case kGLImplementationOSMesaGL:
+@@ -35,7 +37,8 @@ scoped_refptr<GLImage> GLImage::CreateGLImageForGpuMemoryBuffer(
+     case kGLImplementationAppleGL:
+       switch (buffer.type) {
+         case SHARED_MEMORY_BUFFER: {
+-          scoped_refptr<GLImageShm> image(new GLImageShm(size));
++          scoped_refptr<GLImageShm> image(
++              new GLImageShm(size, internalformat));
+           if (!image->Initialize(buffer))
+             return NULL;
+ 
+diff --git a/ui/gl/gl_image_ozone.cc b/ui/gl/gl_image_ozone.cc
+index c217f99..a1c1329 100644
+--- a/ui/gl/gl_image_ozone.cc
++++ b/ui/gl/gl_image_ozone.cc
+@@ -27,7 +27,9 @@ scoped_refptr<GLImage> GLImage::CreateGLImage(gfx::PluginWindowHandle window) {
+ }
+ 
+ scoped_refptr<GLImage> GLImage::CreateGLImageForGpuMemoryBuffer(
+-    gfx::GpuMemoryBufferHandle buffer, gfx::Size size) {
++    gfx::GpuMemoryBufferHandle buffer,
++    gfx::Size size,
++    unsigned internalformat) {
+   TRACE_EVENT0("gpu", "GLImage::CreateGLImageForGpuMemoryBuffer");
+   switch (GetGLImplementation()) {
+     case kGLImplementationOSMesaGL:
+diff --git a/ui/gl/gl_image_shm.cc b/ui/gl/gl_image_shm.cc
+index 14ed836..78e8164 100644
+--- a/ui/gl/gl_image_shm.cc
++++ b/ui/gl/gl_image_shm.cc
+@@ -10,7 +10,11 @@
+ 
+ namespace gfx {
+ 
+-GLImageShm::GLImageShm(gfx::Size size) : size_(size) {
++GLImageShm::GLImageShm(gfx::Size size, unsigned internalformat)
++    : size_(size),
++      internalformat_(internalformat) {
++  // GL_RGBA8_OES is currently the only supported internalformat.
++  DCHECK_EQ(static_cast<GLenum>(GL_RGBA8_OES), internalformat);
+ }
+ 
+ GLImageShm::~GLImageShm() {
+@@ -40,8 +44,23 @@ bool GLImageShm::BindTexImage() {
+   TRACE_EVENT0("gpu", "GLImageShm::BindTexImage");
+   DCHECK(shared_memory_);
+ 
+-  const int kBytesPerPixel = 4;
+-  size_t size = size_.GetArea() * kBytesPerPixel;
++  GLenum internalformat;
++  GLenum format;
++  GLenum type;
++  int bytes_per_pixel;
++  switch (internalformat_) {
++    case GL_RGBA8_OES:
++      internalformat = GL_RGBA;
++      format = GL_RGBA;
++      type = GL_UNSIGNED_BYTE;
++      bytes_per_pixel = 4;
++      break;
++    default:
++      DVLOG(0) << "Invalid format: " << internalformat_;
++      return false;
++  }
++
++  size_t size = size_.GetArea() * bytes_per_pixel;
+   DCHECK(!shared_memory_->memory());
+   if (!shared_memory_->Map(size)) {
+     DVLOG(0) << "Failed to map shared memory.";
+@@ -51,12 +70,12 @@ bool GLImageShm::BindTexImage() {
+   DCHECK(shared_memory_->memory());
+   glTexImage2D(GL_TEXTURE_2D,
+                0,  // mip level
+-               GL_RGBA,
++               internalformat,
+                size_.width(),
+                size_.height(),
+                0,  // border
+-               GL_RGBA,
+-               GL_UNSIGNED_BYTE,
++               format,
++               type,
+                shared_memory_->memory());
+ 
+   shared_memory_->Unmap();
+diff --git a/ui/gl/gl_image_shm.h b/ui/gl/gl_image_shm.h
+index 70233f9..ffdfc8b 100644
+--- a/ui/gl/gl_image_shm.h
++++ b/ui/gl/gl_image_shm.h
+@@ -12,7 +12,7 @@ namespace gfx {
+ 
+ class GL_EXPORT GLImageShm : public GLImage {
+  public:
+-  explicit GLImageShm(gfx::Size size);
++  GLImageShm(gfx::Size size, unsigned internalformat);
+ 
+   bool Initialize(gfx::GpuMemoryBufferHandle buffer);
+ 
+@@ -28,6 +28,7 @@ class GL_EXPORT GLImageShm : public GLImage {
+  private:
+   scoped_ptr<base::SharedMemory> shared_memory_;
+   gfx::Size size_;
++  unsigned internalformat_;
+ 
+   DISALLOW_COPY_AND_ASSIGN(GLImageShm);
+ };
+diff --git a/ui/gl/gl_image_win.cc b/ui/gl/gl_image_win.cc
+index 26b4a8f..1486520 100644
+--- a/ui/gl/gl_image_win.cc
++++ b/ui/gl/gl_image_win.cc
+@@ -27,7 +27,9 @@ scoped_refptr<GLImage> GLImage::CreateGLImage(gfx::PluginWindowHandle window) {
+ }
+ 
+ scoped_refptr<GLImage> GLImage::CreateGLImageForGpuMemoryBuffer(
+-    gfx::GpuMemoryBufferHandle buffer, gfx::Size size) {
++    gfx::GpuMemoryBufferHandle buffer,
++    gfx::Size size,
++    unsigned internalformat) {
+   TRACE_EVENT0("gpu", "GLImage::CreateGLImageForGpuMemoryBuffer");
+   switch (GetGLImplementation()) {
+     case kGLImplementationOSMesaGL:
+@@ -35,7 +37,8 @@ scoped_refptr<GLImage> GLImage::CreateGLImageForGpuMemoryBuffer(
+     case kGLImplementationEGLGLES2:
+       switch (buffer.type) {
+         case SHARED_MEMORY_BUFFER: {
+-          scoped_refptr<GLImageShm> image(new GLImageShm(size));
++          scoped_refptr<GLImageShm> image(
++              new GLImageShm(size, internalformat));
+           if (!image->Initialize(buffer))
+             return NULL;
+ 
+diff --git a/ui/gl/gl_image_x11.cc b/ui/gl/gl_image_x11.cc
+index a6c09a1..6f7d8c6 100644
+--- a/ui/gl/gl_image_x11.cc
++++ b/ui/gl/gl_image_x11.cc
+@@ -35,7 +35,9 @@ scoped_refptr<GLImage> GLImage::CreateGLImage(gfx::PluginWindowHandle window) {
+ }
+ 
+ scoped_refptr<GLImage> GLImage::CreateGLImageForGpuMemoryBuffer(
+-    gfx::GpuMemoryBufferHandle buffer, gfx::Size size) {
++    gfx::GpuMemoryBufferHandle buffer,
++    gfx::Size size,
++    unsigned internalformat) {
+   TRACE_EVENT0("gpu", "GLImage::CreateGLImageForGpuMemoryBuffer");
+   switch (GetGLImplementation()) {
+     case kGLImplementationOSMesaGL:
+@@ -43,7 +45,8 @@ scoped_refptr<GLImage> GLImage::CreateGLImageForGpuMemoryBuffer(
+     case kGLImplementationEGLGLES2:
+       switch (buffer.type) {
+         case SHARED_MEMORY_BUFFER: {
+-          scoped_refptr<GLImageShm> image(new GLImageShm(size));
++          scoped_refptr<GLImageShm> image(
++              new GLImageShm(size, internalformat));
+           if (!image->Initialize(buffer))
+             return NULL;
+ 
+-- 
+1.8.3.2
+

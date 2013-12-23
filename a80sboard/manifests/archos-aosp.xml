@@ -18,7 +18,7 @@
 	<project path="packages/apps/CMFileManager" name="android_packages_apps_CMFileManager" remote="cyanogenmod" revision="master" />
 
 	
-	<project path="vendor/archos" name="android_vendor_archos" groups="vendor,archos" remote="trevd" revision="master"/>
+	
 	<project path="vendor/ti/a80sboard" name="android_vendor_ti_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />
 	<project path="vendor/imgtec/a80sboard" name="android_vendor_imgtec_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />
 

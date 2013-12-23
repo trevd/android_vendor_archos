@@ -1,0 +1,222 @@
+diff -ruN hardware/libhardware/include/hardware/hwcomposer.h hardware/libhardware/include/hardware/hwcomposer.h
+--- hardware/libhardware/include/hardware/hwcomposer.h	2013-12-13 20:43:46.738936146 +0000
++++ hardware/libhardware/include/hardware/hwcomposer.h	2013-12-09 17:17:20.904996674 +0000
+@@ -268,6 +268,88 @@
+ 
+ } hwc_layer_1_t;
+ 
++#ifdef OMAP_ENHANCEMENT
++
++/*
++ * HWC extension operations, see HWC_EXTENDED_API
++ */
++enum {
++    /*
++     * Get extra layer data
++     * @params
++     * data: hwc_layer_extended_t
++     */
++    HWC_EXTENDED_OP_LAYERDATA = 1,
++
++    /*
++     * Returns layer stack identifier
++     * @params
++     * data: hwc_layer_stack_t
++     */
++    HWC_EXTENDED_OP_LAYERSTACK = 2,
++
++    /*
++     * Returns display information
++     * @params
++     * data: hwc_display_info_t
++     */
++    HWC_EXTENDED_OP_DISPLAYINFO = 3,
++};
++
++typedef struct hwc_layer_extended {
++    /*
++     * Layer index (input)
++     */
++    uint32_t idx;
++
++    /*
++     * Display index (input)
++     */
++    int32_t dpy;
++
++    /*
++     * Provides a unique identity for this layer (output)
++     */
++    uint32_t identity;
++} hwc_layer_extended_t;
++
++typedef struct hwc_layer_stack {
++    /*
++     * Display index (input)
++     */
++    int32_t dpy;
++
++    /*
++     * Layer stack identifier for this display (output)
++     */
++    uint32_t stack;
++} hwc_layer_stack_t;
++
++typedef struct hwc_display_info {
++    /*
++     * Display index (input)
++     */
++    int32_t dpy;
++
++    /*
++     * Display resolution (output)
++     */
++    uint32_t width;
++    uint32_t height;
++
++    /*
++     * Display orientation (output)
++     */
++    uint32_t orientation;
++} hwc_display_info_t;
++
++typedef struct hwc_layer_list_extended {
++    size_t numHwLayers;
++    hwc_layer_extended_t hwLayers[0];
++} hwc_layer_list_extended_t;
++
++#endif
++
+ /* This represents a display, typically an EGLDisplay object */
+ typedef void* hwc_display_t;
+ 
+@@ -284,6 +366,14 @@
+      * and acquire fences.
+      */
+     HWC_GEOMETRY_CHANGED = 0x00000001,
++	#ifdef OMAP_ENHANCEMENT
++    /*
++     * HWC_EXTENDED_API is set by SurfaceFlinger to indicate that the h/w
++     * composer HAL api has been extended and that the HAL implementation
++     * can use functions in the extended ABI.
++     */
++    HWC_EXTENDED_API = 0x80000000,
++#endif        
+ };
+ 
+ /*
+@@ -315,8 +405,8 @@
+             hwc_surface_t sur;
+         };
+ 
+-        /* These fields are used for virtual displays when the h/w composer
+-         * version is at least HWC_DEVICE_VERSION_1_3. */
++        /* WARNING: These fields are for experimental virtual display support,
++         * and are not currently used. */
+         struct {
+             /* outbuf is the buffer that receives the composed image for
+              * virtual displays. Writes to the outbuf must wait until
+@@ -324,28 +414,14 @@
+              * writes to outbuf are complete should be returned in
+              * retireFenceFd.
+              *
+-             * This field is set before prepare(), so properties of the buffer
+-             * can be used to decide which layers can be handled by h/w
+-             * composer.
+-             *
+-             * If prepare() sets all layers to FRAMEBUFFER, then GLES
+-             * composition will happen directly to the output buffer. In this
+-             * case, both outbuf and the FRAMEBUFFER_TARGET layer's buffer will
+-             * be the same, and set() has no work to do besides managing fences.
++             * This field will not be updated until after prepare(). If
++             * prepare() sets all non-FB layers to OVERLAY or sets all non-FB
++             * layers to FRAMEBUFFER, then the FRAMEBUFFER_TARGET buffer and
++             * the output buffer may be the same. In mixed OVERLAY/FRAMEBUFFER
++             * configurations they will have different buffers so the
++             * h/w composer does not have to read and write the same buffer.
+              *
+-             * If the TARGET_FORCE_HWC_FOR_VIRTUAL_DISPLAYS board config
+-             * variable is defined (not the default), then this behavior is
+-             * changed: if all layers are marked for FRAMEBUFFER, GLES
+-             * composition will take place to a scratch framebuffer, and
+-             * h/w composer must copy it to the output buffer. This allows the
+-             * h/w composer to do format conversion if there are cases where
+-             * that is more desirable than doing it in the GLES driver or at the
+-             * virtual display consumer.
+-             *
+-             * If some or all layers are marked OVERLAY, then the framebuffer
+-             * and output buffer will be different. As with physical displays,
+-             * the framebuffer handle will not change between frames if all
+-             * layers are marked for OVERLAY.
++             * For physical displays, outbuf will be NULL.
+              */
+             buffer_handle_t outbuf;
+ 
+@@ -428,7 +504,29 @@
+      * HWC_DEVICE_API_VERSION_1_0.
+      */
+     void (*hotplug)(const struct hwc_procs* procs, int disp, int connected);
++#ifdef OMAP_ENHANCEMENT
++    /*
++     * (*extension_cb)() is called by the h/w composer HAL. Its purpose is
++     * to extend the api from h/w composer to SurfaceFlinger.
++     *
++     * In order to handle mismatching build configuration between
++     * SurfaceFlinger and the h/w composer HAL. The HAL will only call
++     * this callback if HWC_EXTENDED_API is passed in hwc_layer_list_t
++     * flags.
++     *
++     * The "operation" parameter specifies the specific extension required
++     * the caller and callee should maintain the ABI between each other in
++     * the same way as kernel ioctl calls do.
++     *
++     * If the "size" parameter is -1 a return value of zero indicates the
++     * given operation is supported.
++     */
++    int (*extension_cb)(struct hwc_procs* procs,
++                        int operation,
++                        void** data,
++                        int size);
+ 
++#endif
+ } hwc_procs_t;
+ 
+
+--- hardware/libhardware/include/hardware/fb.h	2013-12-13 20:43:46.000000000 +0000
++++ hardware/libhardware/include/hardware/fb.h	2013-12-09 17:17:20.908996674 +0000
+@@ -29,6 +29,9 @@
+ __BEGIN_DECLS
+ 
+ #define GRALLOC_HARDWARE_FB0 "fb0"
++#ifdef OMAP_ENHANCEMENT
++#define GRALLOC_HARDWARE_FB1 "fb1"
++#endif
+ 
+ /*****************************************************************************/
+ 
+@@ -150,12 +153,25 @@
+ 
+ 
+ /** convenience API for opening and closing a supported device */
++#ifdef OMAP_ENHANCEMENT
++static inline int framebuffer_open(const struct hw_module_t* module,
++        struct framebuffer_device_t** device, const char* id) {
++    if (!strcmp(GRALLOC_HARDWARE_FB0, id))
++        return module->methods->open(module,
++                GRALLOC_HARDWARE_FB0, (struct hw_device_t**)device);
++    if (!strcmp(GRALLOC_HARDWARE_FB1, id))
++        return module->methods->open(module,
++                GRALLOC_HARDWARE_FB1, (struct hw_device_t**)device);
+ 
++    return -1;
++}
++#else
+ static inline int framebuffer_open(const struct hw_module_t* module,
+         struct framebuffer_device_t** device) {
+     return module->methods->open(module,
+             GRALLOC_HARDWARE_FB0, (struct hw_device_t**)device);
+ }
++#endif
+ 
+ static inline int framebuffer_close(struct framebuffer_device_t* device) {
+     return device->common.close(&device->common);
