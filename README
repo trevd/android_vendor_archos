@@ -4,7 +4,7 @@ Archos G9 A80S AOSP in 6 Steps
 1. http://source.android.com/source/initializing.html
 2. http://source.android.com/source/downloading.html 
 3. wget https://raw.github.com/trevd/android_vendor_archos/master/vendorinit.sh
-4. chmod 755 vendorinit.sh
+4. sudo chmod 755 vendorinit.sh
 5. source vendorinit.sh
 6. http://source.android.com/source/building-running.html 
 
