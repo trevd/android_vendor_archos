@@ -8,7 +8,7 @@
 	
 	# TI Hardware Repos
 	
-	<remove-project project name="platform/hardware/ti/omap4xxx"  />
+	<remove-project name="platform/hardware/ti/omap4xxx"  />
 	
 	<project path="hardware/ti/domx" name="android_hardware_ti_domx" groups="omap4,archos" remote="trevd" revision="master" />
 	<project path="hardware/ti/wpan" name="android_hardware_ti_wpan" groups="omap4,archos" remote="trevd" revision="master" />
