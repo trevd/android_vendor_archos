@@ -1,22 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
  <remote name="trevd" fetch="git://github.com/trevd" />
- <remote name="cyanogenmod" fetch="git://github.com/Cyanogenmod" />
- 
+ <remote name="CyanogenMod" fetch="git://github.com/CyanogenMod" />
+
+	
 	<project path="device/archos/a80sboard" name="android_device_archos" groups="device,archos,a80sboard" remote="trevd" revision="master" />
-	
-	
-	# TI Hardware Repos
-	
-	<remove-project name="platform/hardware/ti/omap4xxx"  />
-	
+
 	<project path="hardware/ti/domx" name="android_hardware_ti_domx" groups="omap4,archos" remote="trevd" revision="master" />
 	<project path="hardware/ti/wpan" name="android_hardware_ti_wpan" groups="omap4,archos" remote="trevd" revision="master" />
 	<project path="hardware/ti/wlan" name="android_hardware_ti_wlan" groups="omap4,archos" remote="trevd" revision="master" />
 	<project path="hardware/ti/omap4xxx-archos" name="android_hardware_ti_omap4xxx-archos" groups="omap4,archos" remote="trevd" revision="master" />	
-	<project path="packages/apps/CMFileManager" name="android_packages_apps_CMFileManager" remote="cyanogenmod" revision="master" />
-
 	
+	<remove-project name="platform/hardware/ti/omap4xxx"  />
+	<project path="packages/apps/CMFileManager" name="android_packages_apps_CMFileManager" remote="CyanogenMod" revision="cm-11.0" />
 	
 	<project path="vendor/ti/a80sboard" name="android_vendor_ti_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />
 	<project path="vendor/imgtec/a80sboard" name="android_vendor_imgtec_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />

@@ -1,0 +1,76 @@
+Archos G9 A80S AOSP in 6 Steps
+==============================================================
+
+1. http://source.android.com/source/initializing.html
+2. http://source.android.com/source/downloading.html 
+3. wget https://raw.github.com/trevd/android_vendor_archos/master/vendorinit.sh
+4. chmod 755 vendorinit.sh
+5. source vendorinit.sh
+6. http://source.android.com/source/building-running.html 
+
+
+===============================================================
+
+vendor/archos
+=============
+
+This is base camp for building the AOSP for the Archos G9 A80S 
+
+
+Initializing The AOSP Build Environment for Archos Devices
+==========================================================
+
+Complete the steps outlined @
+http://source.android.com/source/initializing.html and
+http://source.android.com/source/downloading.html 
+
+Before beginning the build process we need to sync the Archos
+device tree and hardware repository. 
+
+1. wget https://raw.github.com/trevd/android_vendor_archos/master/vendorinit.sh
+2. chmod 755 vendorinit.sh
+3. source vendorinit.sh
+
+This will do the following :
+
+Downloads the archos-vendor.xml to local_manifests
+Sync the vendor/archos repository the re-run 
+source build/envsetup.sh
+
+The build/envsetup.sh locates and executes the contents of any vendorsetup.sh
+files it finds.
+
+vendor/archos/vendorsetup.sh
+============================
+
+This script takes over the initialization and performs the following actions
+
+1. Applies required patches 
+
+hardware/libhardware - 
+Apply Texas Intrustments OMAP4 Framebuffer and Hardware Composer Enhancements 
+to hwcomposer.h & fb.h
+
+chromium_org - 
+Apply the POWER SGX540_120 gpu driver fix.
+Chromium ( blink ) doesn't support older gpus out of the box.
+Rendering fails on the webbrowser resulting in Black Rectangles 
+
+frameworks/native
+Apply Texas Intrustments OMAP4 Framebuffer and Hardware Composer Enhancements
+to the Surfaceflinger and also add Dithering Support from CyanogenMod
+
+2. Download archos-aosp.xml to local_manifests & runs repo sync for the new projects
+
+This contains the rest of the projects required to enable archos hardware support
+
+
+Building and Running
+====================
+
+The proceedure is outlined @ http://source.android.com/source/building-running.html 
+
+choose "aosp_a80sboard-userdebug" from the lunch menu
+
+
+
