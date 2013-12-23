@@ -29,10 +29,10 @@ diff -ruN frameworks/native/libs/ui/FramebufferNativeWindow.cpp frameworks/nativ
 diff -ruN frameworks/native/libs/ui/PixelFormat.cpp frameworks/native/libs/ui/PixelFormat.cpp
 --- frameworks/native/libs/ui/PixelFormat.cpp	2013-12-22 22:22:42.758378301 +0000
 +++ frameworks/native/libs/ui/PixelFormat.cpp	2013-12-22 12:03:15.077891493 +0000
-@@ -52,6 +52,21 @@
-     }
+@@ -37,6 +37,21 @@
      return BAD_VALUE;
  }
+ 
 +unsigned int minColorDepth(PixelFormat format) {
 +    switch (format) {
 +        case PIXEL_FORMAT_RGBA_8888:
@@ -48,9 +48,11 @@ diff -ruN frameworks/native/libs/ui/PixelFormat.cpp frameworks/native/libs/ui/Pi
 +    }
 +    return BAD_VALUE;
 +}
- 
- // ----------------------------------------------------------------------------
- }; // namespace android
+ ssize_t bitsPerPixel(PixelFormat format) {
+     switch (format) {
+         case PIXEL_FORMAT_RGBA_8888:
+
+
 diff -ruN frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
 --- frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp	2013-12-22 22:22:43.570378299 +0000
 +++ frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp	2013-12-22 09:06:41.217919115 +0000
