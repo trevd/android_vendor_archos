@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
- <remote name="trevd" fetch="git://github.com/trevd" />
+ <remote name="trevd" fetch="https://github.com/trevd" />
 
 	<project path="vendor/archos" name="android_vendor_archos" groups="vendor,archos" remote="trevd" revision="master"/>
 </manifest>
