@@ -1,4 +1,11 @@
+echo "Removing Old Local Vendor Manifests"
+rm .repo/local_manifests/archos-vendor.xml
+rm .repo/local_manifests/archos-aosp.xml
+
 echo "Creating Local Vendor Manifests"
+
+rm .repo/local_manifests/archos-vendor.xml
+rm .repo/local_manifests/archos-aosp.xml
 mkdir .repo/local_manifests
 curl https://raw.github.com/trevd/android_vendor_archos/master/a80sboard/manifests/archos-vendor.xml > .repo/local_manifests/archos-vendor.xml
 

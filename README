@@ -57,8 +57,11 @@ Chromium ( blink ) doesn't support older gpus out of the box.
 Rendering fails on the webbrowser resulting in Black Rectangles 
 
 frameworks/native
-Apply Texas Intrustments OMAP4 Framebuffer and Hardware Composer Enhancements
-to the Surfaceflinger and also add Dithering Support from CyanogenMod
+a. Apply Texas Intrustments OMAP4 Framebuffer and Hardware Composer Enhancements
+	to the Surfaceflinger 
+b. Add Dithering Support from CyanogenMod
+c. Fix SGX540_120 Gfx Rotation and Screenshot glitches
+
 
 2. Download archos-aosp.xml to local_manifests & runs repo sync for the new projects
 
