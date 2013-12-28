@@ -24,7 +24,8 @@ function check_remote_revision(){
 		patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/frameworks_native.patch
 		echo "Patching Libhardware Framework"
 		patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/libhardware.patch
-	
+		echo "Patching System Core"
+		patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/system_core.patch
 		
 		VENDOR_MANIFEST="vendor/archos/a80sboard/manifests/archos-aosp.xml"
 		REPO_MANIFEST=".repo/local_manifests/archos-aosp.xml"

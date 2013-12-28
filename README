@@ -62,6 +62,10 @@ a. Apply Texas Intrustments OMAP4 Framebuffer and Hardware Composer Enhancements
 b. Add Dithering Support from CyanogenMod
 c. Fix SGX540_120 Gfx Rotation and Screenshot glitches
 
+system/core
+Archos GPS Proprietary Binaries references fix. 
+Reimplement SortedVectorImpl::reservedSortedVectorImplX() and VectorImpl::reservedVectorImplX()
+functions to the Android Namespace in libutils
 
 2. Download archos-aosp.xml to local_manifests & runs repo sync for the new projects
 

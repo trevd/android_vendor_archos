@@ -1,0 +1,77 @@
+diff -ruN system/core/include/utils/VectorImpl.h system/core/include/utils/VectorImpl.h
+--- system/core/include/utils/VectorImpl.h	2013-12-28 05:57:46.434520329 +0000
++++ system/core/include/utils/VectorImpl.h	2013-12-28 05:21:07.454540521 +0000
+@@ -117,6 +117,15 @@
+         inline void _do_move_forward(void* dest, const void* from, size_t num) const;
+         inline void _do_move_backward(void* dest, const void* from, size_t num) const;
+ 
++    // take care of FBC...
++    virtual void            reservedVectorImpl1();
++    virtual void            reservedVectorImpl2();
++    virtual void            reservedVectorImpl3();
++    virtual void            reservedVectorImpl4();
++    virtual void            reservedVectorImpl5();
++    virtual void            reservedVectorImpl6();
++    virtual void            reservedVectorImpl7();
++    virtual void            reservedVectorImpl8();
+             // These 2 fields are exposed in the inlines below,
+             // so they're set in stone.
+             void *      mStorage;   // base address of the vector
+@@ -155,6 +164,14 @@
+         
+ protected:
+     virtual int             do_compare(const void* lhs, const void* rhs) const = 0;
++	   virtual void            reservedSortedVectorImpl1();
++   virtual void            reservedSortedVectorImpl2();
++    virtual void            reservedSortedVectorImpl3();
++    virtual void            reservedSortedVectorImpl4();
++    virtual void            reservedSortedVectorImpl5();
++    virtual void            reservedSortedVectorImpl6();
++    virtual void            reservedSortedVectorImpl7();
++    virtual void            reservedSortedVectorImpl8();
+ 
+ private:
+             ssize_t         _indexOrderOf(const void* item, size_t* order = 0) const;
+@@ -178,6 +195,7 @@
+ }; // namespace android
+ 
+ 
++
+ // ---------------------------------------------------------------------------
+ 
+ #endif // ANDROID_VECTOR_IMPL_H
+diff -ruN system/core/libutils/VectorImpl.cpp system/core/libutils/VectorImpl.cpp
+--- system/core/libutils/VectorImpl.cpp	2013-12-28 05:57:47.394520320 +0000
++++ system/core/libutils/VectorImpl.cpp	2013-12-28 05:19:20.438541504 +0000
+@@ -516,6 +516,15 @@
+     do_move_backward(dest, from, num);
+ }
+ 
++void VectorImpl::reservedVectorImpl1() { }
++void VectorImpl::reservedVectorImpl2() { }
++void VectorImpl::reservedVectorImpl3() { }
++void VectorImpl::reservedVectorImpl4() { }
++void VectorImpl::reservedVectorImpl5() { }
++void VectorImpl::reservedVectorImpl6() { }
++void VectorImpl::reservedVectorImpl7() { }
++void VectorImpl::reservedVectorImpl8() { }
++
+ /*****************************************************************************/
+ 
+ SortedVectorImpl::SortedVectorImpl(size_t itemSize, uint32_t flags)
+@@ -631,6 +640,15 @@
+     return i;
+ }
+ 
++void SortedVectorImpl::reservedSortedVectorImpl1() { };
++void SortedVectorImpl::reservedSortedVectorImpl2() { };
++void SortedVectorImpl::reservedSortedVectorImpl3() { };
++void SortedVectorImpl::reservedSortedVectorImpl4() { };
++void SortedVectorImpl::reservedSortedVectorImpl5() { };
++void SortedVectorImpl::reservedSortedVectorImpl6() { };
++void SortedVectorImpl::reservedSortedVectorImpl7() { };
++void SortedVectorImpl::reservedSortedVectorImpl8() { };
++
+ /*****************************************************************************/
+ 
+ }; // namespace android
