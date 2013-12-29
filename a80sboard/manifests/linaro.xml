@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+	<remote name="linaro" fetch="git://android.git.linaro.org" />
+	<remote  name="linaro-other" fetch="git://git.linaro.org" />
+	
+	<remove-project name="platform/external/v8"  />
+	<remove-project name="platform/external/jpeg"  />
+	<remove-project name="platform/bionic"  />
+	
+	<project name="platform/packages/inputmethods/hackerskeyboard"  remote="linaro" path="packages/inputmethods/hackerskeyboard" revision="linaro-master"/>
+	<project name="platform/packages/apps/0xbench" path="packages/apps/0xbench" remote="linaro" revision="linaro-master"/>
+	<project name="platform/external/x264" path="external/x264" remote="linaro" remote="linaro" revision="linaro-master"/>
+	<project path="external/v8" name="platform/external/v8" remote="linaro" revision="linaro_android_4.4.2" />
+	<project path="external/jpeg" name="people/tom.gall/libjpeg-turbo/libjpeg-turbo" revision="android" remote="linaro-other" />
+	<project path="bionic" name="platform/bionic" revision="linaro_android_4.4.2" remote="linaro"  />
+</manifest>

@@ -13,7 +13,11 @@ function check_remote_revision(){
 
 
 }
+function copy_manifests(){
 
+	cp -rvp vendor/archos/a80sboard/manifests/*.xml .repo/local_manifests/
+
+}
 	if [  -z check_remote_revision ] ; then
 		echo "Not on the AOSP Master Branch.... Skipping Archos setup"
 	else	
@@ -27,23 +31,8 @@ function check_remote_revision(){
 		echo "Patching System Core"
 		patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/system_core.patch
 		
-		VENDOR_MANIFEST="vendor/archos/a80sboard/manifests/archos-aosp.xml"
-		REPO_MANIFEST=".repo/local_manifests/archos-aosp.xml"
-		if [ $VENDOR_MANIFEST -nt  $REPO_MANIFEST ] ; then 
-				cp $VENDOR_MANIFEST $REPO_MANIFEST
-				echo "Local Manifest [ archos.xml ] Update... Resyncing"
-				repo sync device/archos/a80sboard
-				repo sync hardware/ti/domx
-				repo sync hardware/ti/wpan
-				repo sync hardware/ti/wlan
-				repo sync hardware/ti/omap4xxx-archos
-				repo sync packages/apps/CMFileManager
-				repo sync vendor/archos
-				repo sync vendor/ti/a80sboard
-				repo sync vendor/imgtec/a80sboard
-				repo sync external/busybox
-
-		fi	
+		copy_manifests
+		rm -rf system/extra/su
 	fi
 	
 	
