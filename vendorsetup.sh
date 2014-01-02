@@ -30,6 +30,8 @@ function copy_manifests(){
 		patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/libhardware.patch
 		echo "Patching System Core"
 		patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/system_core.patch
+		echo "Patching Hackers Keyboard"
+		patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/hackerskeyboard.patch
 		
 		copy_manifests
 		rm -rf system/extra/su

@@ -1,0 +1,12 @@
+diff -ruN packages/inputmethods/hackerskeyboard/java/Android.mk packages/inputmethods/hackerskeyboard/java/Android.mk
+--- packages/inputmethods/hackerskeyboard/java/Android.mk	2014-01-02 16:43:19.902197799 +0000
++++ packages/inputmethods/hackerskeyboard/java/Android.mk	2014-01-02 16:44:31.166197145 +0000
+@@ -21,6 +21,8 @@
+ 
+ LOCAL_PROGUARD_FLAG_FILES := proguard.flags
+ 
++LOCAL_OVERRIDES_PACKAGES := LatinIME
++
+ include $(BUILD_PACKAGE)
+ 
+ include $(call all-makefiles-under,$(LOCAL_PATH))
