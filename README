@@ -47,25 +47,33 @@ This script takes over the initialization and performs the following actions
 
 1. Applies required patches 
 
-hardware/libhardware - 
+hardware/libhardware - vendor/archos/a80sboard/patches/libhardware.patch
 Apply Texas Intrustments OMAP4 Framebuffer and Hardware Composer Enhancements 
 to hwcomposer.h & fb.h
 
-chromium_org - 
+chromium_org - vendor/archos/a80sboard/patches/chromium.patch
 Apply the POWER SGX540_120 gpu driver fix.
 Chromium ( blink ) doesn't support older gpus out of the box.
 Rendering fails on the webbrowser resulting in Black Rectangles 
 
-frameworks/native
+frameworks/native - vendor/archos/a80sboard/patches/frameworks_native.patch
 a. Apply Texas Intrustments OMAP4 Framebuffer and Hardware Composer Enhancements
 	to the Surfaceflinger 
 b. Add Dithering Support from CyanogenMod
 c. Fix SGX540_120 Gfx Rotation and Screenshot glitches
 
-system/core
+system/core - vendor/archos/a80sboard/patches/system_core.patch
 Archos GPS Proprietary Binaries references fix. 
 Reimplement SortedVectorImpl::reservedSortedVectorImplX() and VectorImpl::reservedVectorImplX()
 functions to the Android Namespace in libutils
+
+packages/apps/inputmethods/hackerskeyboard - vendor/archos/a80sboard/patches/hackerskeyboard.patch
+Remove the Launcher Icon for the HackersKeyboard as it is no longer required
+Override LatinIME Package to make the HackersKeyboard the default input
+
+packages/apps/Settings - vendor/archos/a80sboard/patches/embedded_superuser.patch
+Enable Embedded Superuser in settings menu
+
 
 2. Download archos-aosp.xml to local_manifests & runs repo sync for the new projects
 
