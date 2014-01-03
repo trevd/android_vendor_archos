@@ -41,7 +41,7 @@ SENSOR_NVM_PATH /data/gps/logs/
 #Session log Control 
 #0->Dont write
 #1->Write to NVM
-SESSION_LOG_CONTROL 0
+SESSION_LOG_CONTROL 1
 
 #Session log NVM setting
 SESSION_LOG_NVM_PATH /data/gps/logs/
