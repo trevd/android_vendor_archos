@@ -14,22 +14,23 @@
 
 # Archos blob(s) necessary for a80sboard hardware
 PRODUCT_PACKAGES := \
-	abcbox \
-	gps.omap4 \
-	sensors.omap4 \
-	libgps \
-	libgpsservices \
-	libmcphalgps \
-	libsupllocationprovider \
-	akmd8975 \
-	navd \
-	batteryd \
-	client_keystore \
-	GPSCConfigFile \
-	GpsConfigFile \
-	inavconfigfile \
-	pathconfigfile \
-	PeriodicConfFile \
-	SuplConfig \
-	patch-X.0 \
-	utility_kdflasher
+    abcbox \
+    gps.omap4 \
+    sensors.omap4 \
+    libgps \
+    libgpsservices \
+    libmcphalgps \
+    libsupllocationprovider \
+    akmd8975 \
+    navd \
+    start_navd \
+    batteryd \
+    client_keystore \
+    GPSCConfigFile \
+    GpsConfigFile \
+    inavconfigfile \
+    pathconfigfile \
+    PeriodicConfFile \
+    SuplConfig \
+    patch-X.0 \
+    utility_kdflasher
