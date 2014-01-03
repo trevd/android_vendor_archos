@@ -7,10 +7,11 @@
 	<remove-project name="platform/external/jpeg"  />
 	
 	
-	<project name="platform/packages/inputmethods/hackerskeyboard"  path="packages/inputmethods/hackerskeyboard" remote="linaro" revision="linaro-master"/>
-	<project name="platform/packages/apps/0xbench" path="packages/apps/0xbench" remote="linaro" revision="linaro-master"/>
-	<project name="platform/external/x264" path="external/x264" remote="linaro" revision="linaro-master"/>
-	<project path="external/v8" name="platform/external/v8" remote="linaro" revision="linaro_android_4.4.2" />
-	<project path="external/jpeg" name="people/tom.gall/libjpeg-turbo/libjpeg-turbo" revision="android" remote="linaro-other" />
-	
+    <project name="platform/packages/inputmethods/hackerskeyboard"  path="packages/inputmethods/hackerskeyboard" remote="linaro" revision="linaro-master"/>
+    <project name="platform/packages/apps/0xbench" path="packages/apps/0xbench" remote="linaro" revision="linaro-master"/>
+    <!-- <project name="platform/external/x264" path="external/x264" remote="linaro" revision="linaro-master"/> -->
+    <project name="platform/external/AndroidTerm" path="packages/apps/AndroidTerm" revision="linaro-master"/>
+    <project path="external/v8" name="platform/external/v8" remote="linaro" revision="linaro_android_4.4.2" />
+    <project path="external/jpeg" name="people/tom.gall/libjpeg-turbo/libjpeg-turbo" revision="android" remote="linaro-other" />
+
 </manifest>
