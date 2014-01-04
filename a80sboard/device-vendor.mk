@@ -14,6 +14,10 @@
 
 LOCAL_STEM := a80sboard/device-partial.mk
 
+# GPS configuration
+PRODUCT_COPY_FILES += \
+    vendor/archos/a80sboard/proprietary/pathconfigfile.txt:system/etc/gps.conf
+
 $(call inherit-product-if-exists, vendor/imgtec/$(LOCAL_STEM))
 $(call inherit-product-if-exists, vendor/archos/$(LOCAL_STEM))
 $(call inherit-product-if-exists, vendor/ti/$(LOCAL_STEM))
