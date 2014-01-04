@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
-	<remote name="trevd" fetch="ssh://git@github.com/trevd" />
- 
-	<project path="device/archos/a80sboard" name="android_device_archos_a80sboard" groups="device,archos,a80sboard" remote="trevd" revision="master" />
+    <remote name="trevd" fetch="ssh://git@github.com/trevd" />
 
-	<project path="hardware/ti/domx" name="android_hardware_ti_domx" groups="omap4,archos" remote="trevd" revision="master" />
-	<project path="hardware/ti/wpan" name="android_hardware_ti_wpan" groups="omap4,archos" remote="trevd" revision="master" />
-	<project path="hardware/ti/wlan" name="android_hardware_ti_wlan" groups="omap4,archos" remote="trevd" revision="master" />
-	<project path="hardware/ti/omap4xxx-archos" name="android_hardware_ti_omap4xxx-archos" groups="omap4,archos" remote="trevd" revision="master" />	
-	
-	<remove-project name="platform/hardware/ti/omap4xxx"  />
-	
-	<project path="vendor/ti/a80sboard" name="android_vendor_ti_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />
-	<project path="vendor/imgtec/a80sboard" name="android_vendor_imgtec_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />
+    <project path="device/archos/a80sboard" name="android_device_archos_a80sboard" groups="device,archos,a80sboard" remote="trevd" revision="master" />
 
-	<project path="external/busybox" name="android_external_busybox" groups="vendor,archos" remote="trevd" revision="master" />
+    <project path="hardware/ti/domx" name="android_hardware_ti_domx" groups="omap4,archos" remote="trevd" revision="master" />
+    <project path="hardware/ti/wpan" name="android_hardware_ti_wpan" groups="omap4,archos" remote="trevd" revision="master" />
+    <project path="hardware/ti/wlan" name="android_hardware_ti_wlan" groups="omap4,archos" remote="trevd" revision="master" />
+    <project path="hardware/ti/omap4xxx-archos" name="android_hardware_ti_omap4xxx-archos" groups="omap4,archos" remote="trevd" revision="master" />	
+
+    <remove-project name="platform/hardware/ti/omap4xxx"  />
+
+    <project path="vendor/ti/a80sboard" name="android_vendor_ti_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />
+    <project path="vendor/imgtec/a80sboard" name="android_vendor_imgtec_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />
+
+    <project path="external/busybox" name="android_external_busybox" groups="vendor,archos" remote="trevd" revision="master" />
+    <project path="external/libparted" name="android_external_libparted" groups="vendor,archos" remote="trevd" revision="master" />
 
 </manifest>
