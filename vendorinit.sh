@@ -1,6 +1,6 @@
-
 echo "Creating Local Vendor Manifests"
 
+rm -rfv .repo/local_manifests
 mkdir .repo/local_manifests
 curl https://raw.github.com/trevd/android_vendor_archos/master/a80sboard/manifests/archos-vendor.xml > .repo/local_manifests/archos-vendor.xml
 
