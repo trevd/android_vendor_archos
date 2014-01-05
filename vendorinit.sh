@@ -2,6 +2,8 @@ echo "Removing Old Local Vendor Manifests"
 
 rm .repo/local_manifests/archos-vendor.xml
 rm .repo/local_manifests/archos-aosp.xml
+rm .repo/local_manifests/cyanogenmod.xml
+rm .repo/local_manifests/linaro.xml
 
 
 echo "Creating Local Vendor Manifests"
