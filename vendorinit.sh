@@ -10,11 +10,8 @@ repo sync vendor/archos
 echo "Running source build/envsetup.sh"
 source build/envsetup.sh
 symlink_local_manifests
+repo sync -j16
+apply_additional_patches
 
-
-
-
-
-	
 	
 	

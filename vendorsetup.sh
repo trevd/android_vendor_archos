@@ -28,6 +28,7 @@ function symlink_local_manifests(){
 
     XMLDIR=$ANDROID_BUILD_TOP/vendor/archos/a80sboard/manifests/
     mkdir -pv .repo/local_manifests
+    remove_local_manifests
     ln -sfv $XMLDIRarchos-vendor.xml .repo/local_manifests/archos-vendor.xml
     ln -sfv $XMLDIRarchos-aosp.xml .repo/local_manifests/archos-aosp.xml
     ln -sfv $XMLDIRcyanogenmod.xml .repo/local_manifests/cyanogenmod.xml
@@ -50,18 +51,10 @@ function apply_additional_patches(){
     patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/embedded_superuser.patch
 
 }
-function repo(){
-    
-}
 	if [  -z check_remote_revision ] ; then
 		echo "Not on the AOSP Master Branch.... Skipping Archos setup"
-	else	
-	
-       
-        
-        
-            
-        
+	else	       
+        apply_additional_patches
         rm -rf system/extra/su
 
     fi
