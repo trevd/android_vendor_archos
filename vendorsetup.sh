@@ -3,7 +3,7 @@
 # Patch the build system to show the file list
 #
 #
-
+REPO_LAUNCHER=$( which repo )
 function check_remote_revision(){
 
 	# AOSP MASTER
@@ -13,15 +13,29 @@ function check_remote_revision(){
 
 
 }
-function copy_manifests(){
+function remove_local_manifests(){
 
-	cp -rvp vendor/archos/a80sboard/manifests/*.xml .repo/local_manifests/
+    echo "Removing Old Local Vendor Manifests"
+
+    rm .repo/local_manifests/archos-vendor.xml
+    rm .repo/local_manifests/archos-aosp.xml
+    rm .repo/local_manifests/cyanogenmod.xml
+    rm .repo/local_manifests/linaro.xml
+
 
 }
-	if [  -z check_remote_revision ] ; then
-		echo "Not on the AOSP Master Branch.... Skipping Archos setup"
-	else	
-	
+function symlink_local_manifests(){
+
+    XMLDIR=$ANDROID_BUILD_TOP/vendor/archos/a80sboard/manifests/
+    mkdir -pv .repo/local_manifests
+    ln -sfv $XMLDIRarchos-vendor.xml .repo/local_manifests/archos-vendor.xml
+    ln -sfv $XMLDIRarchos-aosp.xml .repo/local_manifests/archos-aosp.xml
+    ln -sfv $XMLDIRcyanogenmod.xml .repo/local_manifests/cyanogenmod.xml
+    ln -sfv $XMLDIRlinaro.xml .repo/local_manifests/linaro.xml
+
+}
+function apply_additional_patches(){
+
     echo "Patching Chromium"
     patch -p1 --silent --forward --reject-file=- --strip=1 --directory=external/chromium_org < vendor/archos/a80sboard/patches/chromium.patch
     echo "Patching Native Framework"
@@ -35,10 +49,22 @@ function copy_manifests(){
     echo "Patching Settings to enable embedded superuser"
     patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/embedded_superuser.patch
 
-		
-		copy_manifests
-		rm -rf system/extra/su
-	fi
+}
+function repo(){
+    
+}
+	if [  -z check_remote_revision ] ; then
+		echo "Not on the AOSP Master Branch.... Skipping Archos setup"
+	else	
+	
+       
+        
+        
+            
+        
+        rm -rf system/extra/su
+
+    fi
 	
 	
 	
