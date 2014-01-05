@@ -10,10 +10,12 @@ echo "Running source build/envsetup.sh"
 # Make sure we have build sync before trying
 # to run anything
 repo sync build
-source build/envsetup.sh
 symlink_local_manifests
 repo sync -j16
-apply_additional_patches
+source build/envsetup.sh
+
+
+
 
 	
 	
