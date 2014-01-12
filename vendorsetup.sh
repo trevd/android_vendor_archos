@@ -49,6 +49,8 @@ function apply_additional_patches(){
     patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/hackerskeyboard.patch
     echo "Patching Settings to enable embedded superuser"
     patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/embedded_superuser.patch
+    echo "Patching Logcat to enable color output"
+    patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/logcat_color.patch
 
 }
         if [  -z check_remote_revision ] ; then

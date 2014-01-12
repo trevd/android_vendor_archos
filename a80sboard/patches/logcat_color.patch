@@ -1,0 +1,267 @@
+--- system/core/liblog/logprint.c	2014-01-05 14:19:53.060243195 +0000
++++ system/core/liblog/logprint.c	2013-12-24 23:39:37.638175439 +0000
+@@ -17,6 +17,13 @@
+ 
+ #define _GNU_SOURCE /* for asprintf */
+ 
++#define COLOR_BLUE     75
++#define COLOR_DEFAULT 231
++#define COLOR_GREEN    40
++#define COLOR_ORANGE  166
++#define COLOR_RED     196
++#define COLOR_YELLOW  226
++
+ #include <ctype.h>
+ #include <stdio.h>
+ #include <errno.h>
+@@ -39,6 +46,7 @@
+     android_LogPriority global_pri;
+     FilterInfo *filters;
+     AndroidLogPrintFormat format;
++    AndroidLogColoredOutput colored_output;
+ };
+ 
+ static FilterInfo * filterinfo_new(const char * tag, android_LogPriority pri)
+@@ -118,6 +126,23 @@
+     }
+ }
+ 
++static int colorFromPri (android_LogPriority pri)
++{
++    switch (pri) {
++        case ANDROID_LOG_VERBOSE:       return COLOR_DEFAULT;
++        case ANDROID_LOG_DEBUG:         return COLOR_BLUE;
++        case ANDROID_LOG_INFO:          return COLOR_GREEN;
++        case ANDROID_LOG_WARN:          return COLOR_ORANGE;
++        case ANDROID_LOG_ERROR:         return COLOR_RED;
++        case ANDROID_LOG_FATAL:         return COLOR_RED;
++        case ANDROID_LOG_SILENT:        return COLOR_DEFAULT;
++
++        case ANDROID_LOG_DEFAULT:
++        case ANDROID_LOG_UNKNOWN:
++        default:                        return COLOR_DEFAULT;
++    }
++}
++
+ static android_LogPriority filterPriForTag(
+         AndroidLogFormat *p_format, const char *tag)
+ {
+@@ -174,6 +199,7 @@
+ 
+     p_ret->global_pri = ANDROID_LOG_VERBOSE;
+     p_ret->format = FORMAT_BRIEF;
++    p_ret->colored_output = OUTPUT_COLOR_OFF;
+ 
+     return p_ret;
+ }
+@@ -202,6 +228,11 @@
+     p_format->format=format;
+ }
+ 
++void android_log_setColoredOutput(AndroidLogFormat *p_format)
++{
++    p_format->colored_output = OUTPUT_COLOR_ON;
++}
++
+ /**
+  * Returns FORMAT_OFF on invalid string
+  */
+@@ -739,20 +770,32 @@
+      */
+     size_t prefixLen, suffixLen;
+ 
++    size_t prefixColorLen = 0;
++    char * prefixBufTmp = prefixBuf;
++    size_t prefixBufTmpRemainLen = sizeof(prefixBuf);
++
++    if (p_format->colored_output == OUTPUT_COLOR_ON) {
++    prefixColorLen = snprintf(prefixBufTmp, prefixBufTmpRemainLen, "%c[%d;%d;%dm", 0x1B, 38, 5, colorFromPri(entry->priority));
++    if(prefixColorLen >= prefixBufTmpRemainLen)
++        prefixColorLen = prefixBufTmpRemainLen - 1;
++    prefixBufTmp += prefixColorLen;
++    prefixBufTmpRemainLen -= prefixColorLen;
++    }
++
+     switch (p_format->format) {
+         case FORMAT_TAG:
+-            prefixLen = snprintf(prefixBuf, sizeof(prefixBuf),
++            prefixLen = snprintf(prefixBufTmp, prefixBufTmpRemainLen,
+                 "%c/%-8s: ", priChar, entry->tag);
+             strcpy(suffixBuf, "\n"); suffixLen = 1;
+             break;
+         case FORMAT_PROCESS:
+-            prefixLen = snprintf(prefixBuf, sizeof(prefixBuf),
++            prefixLen = snprintf(prefixBufTmp, prefixBufTmpRemainLen,
+                 "%c(%5d) ", priChar, entry->pid);
+             suffixLen = snprintf(suffixBuf, sizeof(suffixBuf),
+                 "  (%s)\n", entry->tag);
+             break;
+         case FORMAT_THREAD:
+-            prefixLen = snprintf(prefixBuf, sizeof(prefixBuf),
++            prefixLen = snprintf(prefixBufTmp, prefixBufTmpRemainLen,
+                 "%c(%5d:%5d) ", priChar, entry->pid, entry->tid);
+             strcpy(suffixBuf, "\n");
+             suffixLen = 1;
+@@ -764,21 +807,21 @@
+             suffixLen = 1;
+             break;
+         case FORMAT_TIME:
+-            prefixLen = snprintf(prefixBuf, sizeof(prefixBuf),
++            prefixLen = snprintf(prefixBufTmp, prefixBufTmpRemainLen,
+                 "%s.%03ld %c/%-8s(%5d): ", timeBuf, entry->tv_nsec / 1000000,
+                 priChar, entry->tag, entry->pid);
+             strcpy(suffixBuf, "\n");
+             suffixLen = 1;
+             break;
+         case FORMAT_THREADTIME:
+-            prefixLen = snprintf(prefixBuf, sizeof(prefixBuf),
++            prefixLen = snprintf(prefixBufTmp, prefixBufTmpRemainLen,
+                 "%s.%03ld %5d %5d %c %-8s: ", timeBuf, entry->tv_nsec / 1000000,
+                 entry->pid, entry->tid, priChar, entry->tag);
+             strcpy(suffixBuf, "\n");
+             suffixLen = 1;
+             break;
+         case FORMAT_LONG:
+-            prefixLen = snprintf(prefixBuf, sizeof(prefixBuf),
++            prefixLen = snprintf(prefixBufTmp, prefixBufTmpRemainLen,
+                 "[ %s.%03ld %5d:%5d %c/%-8s ]\n",
+                 timeBuf, entry->tv_nsec / 1000000, entry->pid,
+                 entry->tid, priChar, entry->tag);
+@@ -788,7 +831,7 @@
+             break;
+         case FORMAT_BRIEF:
+         default:
+-            prefixLen = snprintf(prefixBuf, sizeof(prefixBuf),
++            prefixLen = snprintf(prefixBufTmp, prefixBufTmpRemainLen,
+                 "%c/%-8s(%5d): ", priChar, entry->tag, entry->pid);
+             strcpy(suffixBuf, "\n");
+             suffixLen = 1;
+@@ -800,11 +843,22 @@
+      * possibly causing heap corruption.  To avoid this we double check and
+      * set the length at the maximum (size minus null byte)
+      */
+-    if(prefixLen >= sizeof(prefixBuf))
+-        prefixLen = sizeof(prefixBuf) - 1;
++    if(prefixLen >= prefixBufTmpRemainLen)
++        prefixLen = prefixBufTmpRemainLen - 1;
+     if(suffixLen >= sizeof(suffixBuf))
+         suffixLen = sizeof(suffixBuf) - 1;
+ 
++    size_t suffixColorLen = 0;
++    char * suffixBufTmp = suffixBuf + suffixLen;
++    size_t suffixBufTmpRemainLen = sizeof(suffixBuf) - suffixLen;
++
++    if (p_format->colored_output == OUTPUT_COLOR_ON) {
++    suffixColorLen = snprintf(suffixBufTmp, suffixBufTmpRemainLen, "%c[%dm", 0x1B, 0);
++    if(suffixColorLen >= suffixBufTmpRemainLen)
++        suffixColorLen = suffixBufTmpRemainLen - 1;
++    }
++
++
+     /* the following code is tragically unreadable */
+ 
+     size_t numLines;
+@@ -831,7 +885,7 @@
+ 
+     // this is an upper bound--newlines in message may be counted
+     // extraneously
+-    bufferSize = (numLines * (prefixLen + suffixLen)) + entry->messageLen + 1;
++    bufferSize = (numLines * (prefixColorLen + prefixLen + suffixLen + suffixColorLen)) + entry->messageLen + 1;
+ 
+     if (defaultBufferSize >= bufferSize) {
+         ret = defaultBuffer;
+@@ -850,11 +904,11 @@
+ 
+     if (prefixSuffixIsHeaderFooter) {
+         strcat(p, prefixBuf);
+-        p += prefixLen;
++        p += prefixColorLen + prefixLen;
+         strncat(p, entry->message, entry->messageLen);
+         p += entry->messageLen;
+         strcat(p, suffixBuf);
+-        p += suffixLen;
++        p += suffixLen + suffixColorLen;
+     } else {
+         while(pm < (entry->message + entry->messageLen)) {
+             const char *lineStart;
+@@ -867,11 +921,11 @@
+             lineLen = pm - lineStart;
+ 
+             strcat(p, prefixBuf);
+-            p += prefixLen;
++            p += prefixColorLen + prefixLen;
+             strncat(p, lineStart, lineLen);
+             p += lineLen;
+             strcat(p, suffixBuf);
+-            p += suffixLen;
++            p += suffixLen + suffixColorLen;
+ 
+             if (*pm == '\n') pm++;
+         }
+--- system/core/liblog/logcat.cpp	2014-01-05 14:19:53.292243199 +0000
++++ system/core/logcat/logcat.cpp	2013-12-24 23:39:37.770175435 +0000
+@@ -410,7 +410,8 @@
+                     "  -b <buffer>     Request alternate ring buffer, 'main', 'system', 'radio'\n"
+                     "                  or 'events'. Multiple -b parameters are allowed and the\n"
+                     "                  results are interleaved. The default is -b main -b system.\n"
+-                    "  -B              output the log in binary");
++                    "  -B              output the log in binary\n"
++                    "  -C              colored output");
+ 
+ 
+     fprintf(stderr,"\nfilterspecs are a series of \n"
+@@ -452,6 +453,11 @@
+     return 0;
+ }
+ 
++static void setColoredOutput()
++{
++    android_log_setColoredOutput(g_logformat);
++}
++
+ extern "C" void logprint_run_tests(void);
+ 
+ int main(int argc, char **argv)
+@@ -481,7 +487,7 @@
+     for (;;) {
+         int ret;
+ 
+-        ret = getopt(argc, argv, "cdt:gsQf:r::n:v:b:B");
++        ret = getopt(argc, argv, "cdt:gsQf:r::n:v:b:BC");
+ 
+         if (ret < 0) {
+             break;
+@@ -511,6 +517,10 @@
+                 getLogSize = 1;
+             break;
+ 
++            case 'C':
++                setColoredOutput();
++            break;
++
+             case 'b': {
+                 char* buf = (char*) malloc(strlen(LOG_FILE_DIR) + strlen(optarg) + 1);
+                 strcpy(buf, LOG_FILE_DIR);
+--- system/core/include/log/logprint.h	2014-01-05 14:19:52.480243185 +0000
++++ system/core/include/log/logprint.h	2013-12-24 23:39:37.414175446 +0000
+@@ -38,6 +38,11 @@
+     FORMAT_LONG,
+ } AndroidLogPrintFormat;
+ 
++typedef enum {
++    OUTPUT_COLOR_ON = 0,
++    OUTPUT_COLOR_OFF,
++} AndroidLogColoredOutput;
++
+ typedef struct AndroidLogFormat_t AndroidLogFormat;
+ 
+ typedef struct AndroidLogEntry_t {
+@@ -58,6 +63,8 @@
+ void android_log_setPrintFormat(AndroidLogFormat *p_format, 
+         AndroidLogPrintFormat format);
+ 
++void android_log_setColoredOutput(AndroidLogFormat *p_format);
++
+ /**
+  * Returns FORMAT_OFF on invalid string
+  */
