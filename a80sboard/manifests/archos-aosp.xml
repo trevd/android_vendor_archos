@@ -4,6 +4,7 @@
 
     <project path="device/archos/a80sboard" name="android_device_archos_a80sboard" groups="device,archos,a80sboard" remote="trevd" revision="master" />
 
+    <project path="hardware/ril/archos_ril" name="android_hardware_ril_libarchos_ril" groups="omap4,archos" remote="trevd" revision="master" />
     <project path="hardware/ti/domx" name="android_hardware_ti_domx" groups="omap4,archos" remote="trevd" revision="master" />
     <project path="hardware/ti/wpan" name="android_hardware_ti_wpan" groups="omap4,archos" remote="trevd" revision="master" />
     <project path="hardware/ti/wlan" name="android_hardware_ti_wlan" groups="omap4,archos" remote="trevd" revision="master" />

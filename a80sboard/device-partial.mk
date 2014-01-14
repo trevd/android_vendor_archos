@@ -33,4 +33,6 @@ PRODUCT_PACKAGES := \
     PeriodicConfFile \
     SuplConfig \
     patch-X.0 \
+    libtcl-ril \
+    pppd_secrets \
     utility_kdflasher
