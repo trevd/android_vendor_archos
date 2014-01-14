@@ -15,6 +15,7 @@
     <project path="vendor/imgtec/a80sboard" name="android_vendor_imgtec_a80sboard" groups="vendor,archos" remote="trevd" revision="master" />
 
     <project path="external/busybox" name="android_external_busybox" groups="vendor,archos" remote="trevd" revision="master" />
+    <project path="external/sl" name="android_external_sl" groups="vendor,archos" remote="trevd" revision="master" />
     <project path="external/libparted" name="android_external_libparted" groups="vendor,archos" remote="trevd" revision="master" />
 
 </manifest>
