@@ -6,7 +6,7 @@
 	<project path="external/koush/Widgets" name="Widgets" remote="CyanogenMod" revision="cm-11.0" />
     
     
-    <project path="external/bash" name="android_external_bash" />
-    <project path="external/libncurses" name="git://github.com/CyanogenMod/android_external_libncurses" />
+    <project path="external/bash" name="android_external_bash" remote="CyanogenMod" revision="cm-11.0" />
+    <project path="external/libncurses" name="android_external_libncurses" remote="CyanogenMod" revision="cm-11.0" />
 
 </manifest>
