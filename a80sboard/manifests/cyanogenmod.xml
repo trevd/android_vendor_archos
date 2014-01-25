@@ -1,12 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
 	<remote name="CyanogenMod" fetch="git://github.com/CyanogenMod" />
-	<project path="packages/apps/CMFileManager" name="android_packages_apps_CMFileManager" remote="CyanogenMod" revision="cm-11.0" />
-	<project path="external/koush/Superuser" name="Superuser" remote="CyanogenMod" revision="cm-11.0" />
-	<project path="external/koush/Widgets" name="Widgets" remote="CyanogenMod" revision="cm-11.0" />
+    
+    <!-- CMFileManager for easy built-in file management -->
+    <project path="packages/apps/CMFileManager" name="android_packages_apps_CMFileManager" remote="CyanogenMod" revision="cm-11.0" />
     
     
+    <project path="external/koush/Superuser" name="Superuser" remote="CyanogenMod" revision="cm-11.0" />
+    <project path="external/koush/Widgets" name="Widgets" remote="CyanogenMod" revision="cm-11.0" />
+
+
+    <!-- 
+    
+    Bash Shell which is depends on libncurses
+    
+    -->
     <project path="external/bash" name="android_external_bash" remote="CyanogenMod" revision="cm-11.0" />
     <project path="external/libncurses" name="android_external_libncurses" remote="CyanogenMod" revision="cm-11.0" />
+
+    
+    <project name="android_external_wpa_supplicant_8_ti" path="external/wpa_supplicant_8_ti" remote="CyanogenMod" revision="cm-11.0" />
+    
+    <!-- 
+    
+    Replace AOSP libhardware_legacy with CM's one. This adds support for TI's wpa_supplicant 
+    We can also use omapzoom.org libhardware_legacy to achieve the same result
+    http://omapzoom.org/?p=platform/hardware/libhardware_legacy.git 
+    
+    -->
+    <remove-project name="platform/hardware/libhardware_legacy"  />
+    <project name="android_hardware_libhardware_legacy" path="hardware/libhardware_legacy" remote="CyanogenMod" revision="cm-11.0"/>
 
 </manifest>
