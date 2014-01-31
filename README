@@ -74,6 +74,12 @@ Override LatinIME Package to make the HackersKeyboard the default input
 packages/apps/Settings - vendor/archos/a80sboard/patches/embedded_superuser.patch
 Enable Embedded Superuser in settings menu
 
+system/core/logcat - vendor/archos/a80sboard/patches/logcat_color.patch
+Add the -C color output to logcat
+
+build - vendor/archos/a80sboard/patches/add_package_filtering.patch
+Enable the PRODUCT_PACKAGES_FILTER build variable to filter out unwanted core products
+and modules
 
 2. Download archos-aosp.xml to local_manifests & runs repo sync for the new projects
 
