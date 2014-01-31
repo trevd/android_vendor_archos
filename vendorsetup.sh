@@ -51,6 +51,8 @@ function apply_additional_patches(){
     patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/embedded_superuser.patch
     echo "Patching Logcat to enable color output"
     patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/logcat_color.patch
+    echo "Patching Build System to enable package filtering"
+    patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/add_package_filtering.patch
 
 }
         if [  -z check_remote_revision ] ; then
