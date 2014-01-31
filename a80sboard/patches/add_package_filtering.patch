@@ -1,14 +1,12 @@
 diff -ruN build/core/main.mk build/core/main.mk
---- build/core/main.mk	2014-01-31 22:32:23.095733087 +0000
-+++ buildn/core/main.mk	2014-01-31 22:34:21.203729345 +0000
-@@ -631,6 +631,10 @@
+--- build/core/main.mk	2014-01-31 23:24:49.807633407 +0000
++++ build/core/main.mk	2014-01-31 23:24:13.339634563 +0000
+@@ -631,6 +631,8 @@
    # Filter out the overridden packages before doing expansion
    product_MODULES := $(filter-out $(foreach p, $(product_MODULES), \
        $(PACKAGES.$(p).OVERRIDES)), $(product_MODULES))
-+  # Filter out the PRODUCT_PACKAGES_FILTER packages before doing expansion
-+  # TODO : This is a bit of a hack as we should be able to implement this
-+  # using a vendor defintions.mk hook 
-+  product_MODULES := $(filter-out $(PRODUCT_PACKAGES_FILTER), $(product_Modules))
++  product_MODULES := $(filter-out $(foreach p, $(product_MODULES), \
++      $(PRODUCT_PACKAGES_FILTER)), $(product_MODULES))
    $(call expand-required-modules,product_MODULES,$(product_MODULES))
    product_FILES := $(call module-installed-files, $(product_MODULES))
    ifeq (0,1)
