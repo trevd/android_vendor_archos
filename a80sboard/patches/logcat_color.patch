@@ -200,7 +200,7 @@
          }
 --- system/core/liblog/logcat.cpp	2014-01-05 14:19:53.292243199 +0000
 +++ system/core/logcat/logcat.cpp	2013-12-24 23:39:37.770175435 +0000
-@@ -410,7 +410,8 @@
+@@ -228,7 +228,8 @@
                      "  -b <buffer>     Request alternate ring buffer, 'main', 'system', 'radio'\n"
                      "                  or 'events'. Multiple -b parameters are allowed and the\n"
                      "                  results are interleaved. The default is -b main -b system.\n"
@@ -210,7 +210,7 @@
  
  
      fprintf(stderr,"\nfilterspecs are a series of \n"
-@@ -452,6 +453,11 @@
+@@ -270,6 +271,11 @@
      return 0;
  }
  
@@ -222,16 +222,16 @@
  extern "C" void logprint_run_tests(void);
  
  int main(int argc, char **argv)
-@@ -481,7 +487,7 @@
+@@ -303,7 +309,7 @@
      for (;;) {
          int ret;
  
--        ret = getopt(argc, argv, "cdt:gsQf:r::n:v:b:B");
-+        ret = getopt(argc, argv, "cdt:gsQf:r::n:v:b:BC");
+-        ret = getopt(argc, argv, "cdt:T:gsQf:r::n:v:b:B");
++        ret = getopt(argc, argv, "cdt:T:gsQf:r::n:v:b:BC");
  
          if (ret < 0) {
              break;
-@@ -511,6 +517,10 @@
+@@ -335,6 +341,10 @@
                  getLogSize = 1;
              break;
  
@@ -240,8 +240,9 @@
 +            break;
 +
              case 'b': {
-                 char* buf = (char*) malloc(strlen(LOG_FILE_DIR) + strlen(optarg) + 1);
-                 strcpy(buf, LOG_FILE_DIR);
+                 bool binary = strcmp(optarg, "events") == 0;
+                 if (binary) {
+
 --- system/core/include/log/logprint.h	2014-01-05 14:19:52.480243185 +0000
 +++ system/core/include/log/logprint.h	2013-12-24 23:39:37.414175446 +0000
 @@ -38,6 +38,11 @@
