@@ -3,6 +3,8 @@
 	<remote name="trevd" fetch="ssh://git@github.com/trevd" />
     
    <project path="vendor/archos" name="android_vendor_archos" groups="vendor,archos" remote="trevd" revision="master"/>
+   <project path="vendor/trevd" name="android_vendor_trevd" groups="vendor,trevd" remote="trevd" revision="master"/>
+   <project path="vendor/google" name="android_vendor_google" groups="vendor,google" remote="trevd" revision="master"/>
    
     <!-- 
     
