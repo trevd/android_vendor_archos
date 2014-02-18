@@ -55,10 +55,10 @@ function apply_additional_patches(){
     patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/add_package_filtering.patch
 
 }
-        if [  -z check_remote_revision ] ; then
-                echo "Not on the AOSP Master Branch.... Skipping Archos setup"
-        else               
-        apply_additional_patches
-        rm -rf system/extra/su
+     #if [  -z check_remote_revision ] ; then
+      #          echo "Not on the AOSP Master Branch.... Skipping Archos setup"
+       # else               
+       # apply_additional_patches
+       # rm -rf system/extra/su
 
-    fi
+    #fi
