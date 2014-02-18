@@ -1,6 +1,6 @@
 diff -ruN packages/inputmethods/hackerskeyboard/java/AndroidManifest.xml packages/inputmethods/hackerskeyboard/java/AndroidManifest.xml
 --- packages/inputmethods/hackerskeyboard/java/AndroidManifest.xml	2014-01-03 04:10:46.301819052 +0000
-+++ packages/inputmethods/hackerskeyboard-new/java/AndroidManifest.xml	2014-01-03 04:11:31.433818638 +0000
++++ packages/inputmethods/hackerskeyboard/java/AndroidManifest.xml	2014-01-03 04:11:31.433818638 +0000
 @@ -28,13 +28,6 @@
              <meta-data android:name="android.view.im" android:resource="@xml/method" />
          </service>
@@ -17,7 +17,7 @@ diff -ruN packages/inputmethods/hackerskeyboard/java/AndroidManifest.xml package
                  <action android:name="android.intent.action.MAIN"/>
 diff -ruN packages/inputmethods/hackerskeyboard/java/Android.mk packages/inputmethods/hackerskeyboard/java/Android.mk
 --- packages/inputmethods/hackerskeyboard/java/Android.mk	2014-01-03 04:10:46.297819052 +0000
-+++ packages/inputmethods/hackerskeyboard-new/java/Android.mk	2014-01-02 16:48:15.970195080 +0000
++++ packages/inputmethods/hackerskeyboard/java/Android.mk	2014-01-02 16:48:15.970195080 +0000
 @@ -21,6 +21,8 @@
  
  LOCAL_PROGUARD_FLAG_FILES := proguard.flags
