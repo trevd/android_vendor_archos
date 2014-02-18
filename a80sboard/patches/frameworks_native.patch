@@ -51,44 +51,6 @@ diff -ruN frameworks/native/libs/ui/PixelFormat.cpp frameworks/native/libs/ui/Pi
  ssize_t bitsPerPixel(PixelFormat format) {
      switch (format) {
          case PIXEL_FORMAT_RGBA_8888:
-diff -ruN frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
---- frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp	2013-12-27 21:17:16.414807100 +0000
-+++ frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp	2013-12-27 20:39:58.326827651 +0000
-@@ -39,7 +39,9 @@
- #ifndef NUM_FRAMEBUFFER_SURFACE_BUFFERS
- #define NUM_FRAMEBUFFER_SURFACE_BUFFERS (2)
- #endif
--
-+#ifdef OMAP_ENHANCEMENT
-+#define GRALLOC_USAGE_HW_FB1 GRALLOC_USAGE_PRIVATE_3
-+#endif
- // ----------------------------------------------------------------------------
- namespace android {
- // ----------------------------------------------------------------------------
-@@ -59,13 +61,22 @@
-     mHwc(hwc)
- {
-     mName = "FramebufferSurface";
--    mConsumer->setConsumerName(mName);
-+	 mConsumer->setConsumerName(mName);
-+#ifdef OMAP_ENHANCEMENT
-+    if (disp == 1)
-+		mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB1 |
-+                                           GRALLOC_USAGE_HW_RENDER |
-+                                           GRALLOC_USAGE_HW_COMPOSER);
-+	else
-+#endif
-     mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
-                                        GRALLOC_USAGE_HW_RENDER |
-                                        GRALLOC_USAGE_HW_COMPOSER);
-+
-     mConsumer->setDefaultBufferFormat(mHwc.getFormat(disp));
-     mConsumer->setDefaultBufferSize(mHwc.getWidth(disp),  mHwc.getHeight(disp));
-     mConsumer->setDefaultMaxBufferCount(NUM_FRAMEBUFFER_SURFACE_BUFFERS);
-+	 mConsumer->setMaxAcquiredBufferCount(NUM_FRAMEBUFFER_SURFACE_BUFFERS - 1);
- }
- 
- status_t FramebufferSurface::beginFrame() {
 diff -ruN frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
 --- frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp	2013-12-27 21:17:16.414807100 +0000
 +++ frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp	2013-12-27 21:04:28.994814147 +0000
