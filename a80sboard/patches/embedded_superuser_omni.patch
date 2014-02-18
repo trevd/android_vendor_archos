@@ -1,0 +1,278 @@
+diff -ruN packages/apps/Settings/AndroidManifest.xml packages/apps/Settings/AndroidManifest.xml
+--- packages/apps/Settings/AndroidManifest.xml	2014-02-18 06:49:42.089504323 +0000
++++ packages/apps/Settings/AndroidManifest.xml	2014-02-18 06:34:40.952409738 +0000
+@@ -69,6 +69,34 @@
+     <uses-permission android:name="android.permission.MANAGE_DEVICE_ADMINS" />
+     <uses-permission android:name="android.permission.READ_SMS" />
+     <uses-permission android:name="android.permission.SEND_SMS" />
++	<uses-permission android:name="android.permission.ACCESS_SUPERUSER" />
++	<uses-permission android:name="android.permission.REPORT_SUPERUSER" />
++	<uses-permission android:name="android.permission.REQUEST_SUPERUSER" />
++	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
++
++
++    <permission
++        android:name="android.permission.REQUEST_SUPERUSER"
++        android:protectionLevel="signature" />
++    <permission
++        android:name="android.permission.REPORT_SUPERUSER"
++        android:protectionLevel="signature" />
++
++    <permission-group
++        android:name="android.permission-group.SUPERUSER"
++        android:description="@string/superuser_description_more"
++        android:icon="@drawable/ic_action_permission"
++        android:label="@string/superuser"
++        android:priority="10000" />
++
++    <permission
++        android:name="android.permission.ACCESS_SUPERUSER"
++        android:description="@string/superuser_description_more"
++        android:icon="@drawable/ic_action_permission"
++        android:label="@string/superuser_description"
++        android:logo="@drawable/ic_action_permission"
++        android:permissionGroup="android.permission-group.SUPERUSER"
++        android:protectionLevel="dangerous" />
+ 
+     <application android:label="@string/settings_label"
+             android:icon="@mipmap/ic_launcher_settings"
+@@ -79,7 +107,62 @@
+             android:supportsRtl="true">
+ 
+         <!-- Settings -->
++      <!-- Only system/su can open this activity -->
++      <!-- This activity will then call the MultitaskSuRequestActivity to create a new task stack -->
++      <activity
++          android:name=".cyanogenmod.superuser.RequestActivity"
++          android:configChanges="keyboardHidden|orientation|screenSize"
++          android:label="@string/superuser"
++          android:launchMode="singleTask"
++          android:excludeFromRecents="true"
++          android:permission="android.permission.REQUEST_SUPERUSER"
++          android:process=":superuser"
++          android:taskAffinity="com.android.settings.superuser"
++          android:theme="@style/RequestThemeDark" />
++      <!-- Only system/su can open this activity -->
++      <!-- This is activity is started in multiuser mode when the user invoking su -->
++      <!-- is not the device owner (user id 0). -->
++      <activity
++          android:name=".cyanogenmod.superuser.NotifyActivity"
++          android:configChanges="keyboardHidden|orientation|screenSize"
++          android:label="@string/superuser"
++          android:launchMode="singleTask"
++          android:excludeFromRecents="true"
++          android:permission="android.permission.REQUEST_SUPERUSER"
++          android:process=":superuser"
++          android:taskAffinity="com.android.settings.superuser"
++          android:theme="@style/RequestThemeDark" />
++
++      <!-- Multiple instances of this activity can be running for multiple su requests -->
++      <activity
++          android:name=".cyanogenmod.superuser.MultitaskSuRequestActivity"
++          android:configChanges="keyboardHidden|orientation|screenSize"
++          android:excludeFromRecents="true"
++          android:exported="false"
++          android:label="@string/request"
++          android:process=":superuser"
++          android:taskAffinity="com.android.settings.superuser"
++          android:theme="@style/RequestThemeDark" />
++
++      <receiver
++          android:name=".cyanogenmod.superuser.SuReceiver"
++          android:permission="android.permission.REPORT_SUPERUSER" />
+ 
++      <receiver
++          android:name=".cyanogenmod.superuser.PackageChangeReceiver" >
++          <intent-filter>
++              <action android:name="android.intent.action.PACKAGE_ADDED" />
++              <data android:scheme="package" />
++          </intent-filter>
++          <intent-filter>
++              <action android:name="android.intent.action.BOOT_COMPLETED" />
++              <data android:scheme="package" />
++          </intent-filter>
++          <intent-filter>
++              <action android:name="android.intent.action.PACKAGE_REMOVED" />
++              <data android:scheme="package" />
++          </intent-filter>
++      </receiver>
+         <activity android:name="Settings"
+                 android:label="@string/settings_label_launcher"
+                 android:taskAffinity="com.android.settings"
+diff -ruN packages/apps/Settings/Android.mk packages/apps/Settings/Android.mk
+--- packages/apps/Settings/Android.mk	2014-02-18 06:49:42.057504569 +0000
++++ packages/apps/Settings/Android.mk	2014-02-18 06:34:40.956409707 +0000
+@@ -8,23 +8,29 @@
+ 
+ LOCAL_SRC_FILES := $(call all-java-files-under, src) \
+         src/com/android/settings/EventLogTags.logtags
++LOCAL_SRC_FILES += $(call all-java-files-under,../../../external/koush/Superuser/Superuser/src) 
++LOCAL_SRC_FILES += $(call all-java-files-under,../../../external/koush/Widgets/Widgets/src)
+ LOCAL_SRC_FILES += $(call all-java-files-under, ../OmniGears/src)
+ LOCAL_SRC_FILES += $(call all-java-files-under, ../PerformanceControl/src)
+ 
+ LOCAL_RESOURCE_DIR += $(LOCAL_PATH)/res
+ LOCAL_RESOURCE_DIR += packages/apps/OmniGears/res
++LOCAL_RESOURCE_DIR += $(LOCAL_PATH)/../../../external/koush/Widgets/Widgets/res 
++LOCAL_RESOURCE_DIR += $(LOCAL_PATH)/../../../external/koush/Superuser/Superuser/res
+ LOCAL_RESOURCE_DIR += packages/apps/PerformanceControl/res
+ 
+ LOCAL_ASSET_DIR += packages/apps/PerformanceControl/assets
+ 
+ LOCAL_AAPT_FLAGS := --auto-add-overlay \
+ 	--extra-packages org.omnirom.omnigears \
++	--extra-packages com.koushikdutta.widgets \
++	--extra-packages com.koushikdutta.superuser \
+ 	--extra-packages com.brewcrewfoo.performance
+ 
+ LOCAL_PACKAGE_NAME := Settings
+ LOCAL_CERTIFICATE := platform
+ LOCAL_PRIVILEGED_MODULE := true
+-
++LOCAL_AAPT_INCLUDE_ALL_RESOURCES := true
+ LOCAL_PROGUARD_FLAG_FILES := proguard.flags
+ 
+ LOCAL_AAPT_FLAGS += -c zz_ZZ
+diff -ruN packages/apps/Settings/proguard.flags packages/apps/Settings/proguard.flags
+--- packages/apps/Settings/proguard.flags	2014-02-18 06:49:42.097504261 +0000
++++ packages/apps/Settings/proguard.flags	2014-02-18 06:34:40.960409676 +0000
+@@ -15,6 +15,8 @@
+ -keep class com.android.settings.NotificationStation
+ -keep class com.android.settings.nfc.*
+ -keep class org.**
++-keep class com.koushikdutta.**
++-keep class com.android.settings.cyanogenmod.superuser.**
+ 
+ # Keep click responders
+ -keepclassmembers class com.android.settings.inputmethod.UserDictionaryAddWordActivity {
+diff -ruN packages/apps/Settings/res/xml/settings_headers.xml packages/apps/Settings/res/xml/settings_headers.xml
+--- packages/apps/Settings/res/xml/settings_headers.xml	2014-02-18 06:49:43.253495407 +0000
++++ packages/apps/Settings/res/xml/settings_headers.xml	2014-02-18 06:34:43.156392567 +0000
+@@ -267,6 +267,14 @@
+             android:targetPackage="eu.chainfire.supersu"
+             android:targetClass="eu.chainfire.supersu.MainActivity" />
+     </header>
++        <!-- Superuser -->
++    <header
++        android:id="@+id/superuser"
++        android:fragment="com.android.settings.cyanogenmod.superuser.PolicyNativeFragment"
++        android:icon="@drawable/ic_action_permission"
++        android:title="@string/superuser" />
++
++
+ 
+     <!-- Performance Controls -->
+     <header
+diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java	1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java	2014-02-18 06:34:40.516413136 +0000
+@@ -0,0 +1,4 @@
++package com.android.settings.cyanogenmod.superuser;
++
++public class MultitaskSuRequestActivity extends com.koushikdutta.superuser.MultitaskSuRequestActivity {
++}
++
+diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java	1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java	2014-02-18 06:34:40.512413167 +0000
+@@ -0,0 +1,4 @@
++package com.android.settings.cyanogenmod.superuser;
++
++public class NotifyActivity extends com.koushikdutta.superuser.NotifyActivity {
++}
++
+diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java	1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java	2014-02-18 06:34:40.516413136 +0000
+@@ -0,0 +1,4 @@
++package com.android.settings.cyanogenmod.superuser;
++
++public class PackageChangeReceiver extends com.koushikdutta.superuser.PackageChangeReceiver {
++}
++
+diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java	1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java	2014-02-18 06:34:40.512413167 +0000
+@@ -0,0 +1,64 @@
++package com.android.settings.cyanogenmod.superuser;
++
++import android.content.res.Resources;
++import android.os.Bundle;
++import android.view.LayoutInflater;
++import android.view.View;
++import android.view.ViewGroup;
++import android.widget.ListView;
++
++import com.android.settings.Utils;
++import com.koushikdutta.superuser.LogNativeFragment;
++import com.koushikdutta.superuser.PolicyFragmentInternal;
++import com.koushikdutta.superuser.SettingsNativeFragment;
++
++public class PolicyNativeFragment extends com.koushikdutta.superuser.PolicyNativeFragment {
++    @Override
++    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
++        View view = super.onCreateView(inflater, container, savedInstanceState);
++        Utils.forcePrepareCustomPreferencesList(container, view, getInternal().getListView(), false);
++        return view;
++    }
++
++    @Override
++    public PolicyFragmentInternal createFragmentInterface() {
++        return new FragmentInternal(this) {
++            @Override
++            protected LogNativeFragment createLogNativeFragment() {
++                return new LogNativeFragment() {
++                    @Override
++                    public View onCreateView(LayoutInflater inflater,
++                            ViewGroup container, Bundle savedInstanceState) {
++                        View view = super.onCreateView(inflater, container, savedInstanceState);
++                        adjustListPadding(getInternal().getListView());
++                        return view;
++                    }
++                };
++            }
++
++            @Override
++            protected SettingsNativeFragment createSettingsNativeFragment() {
++                return new SettingsNativeFragment() {
++                    @Override
++                    public View onCreateView(LayoutInflater inflater,
++                            ViewGroup container, Bundle savedInstanceState) {
++                        View view = super.onCreateView(inflater, container, savedInstanceState);
++                        adjustListPadding(getInternal().getListView());
++                        return view;
++                    }
++                };
++            };
++        };
++    }
++
++    private static void adjustListPadding(ListView list) {
++        final Resources res = list.getResources();
++        final int paddingSide = res.getDimensionPixelSize(
++                com.android.internal.R.dimen.preference_fragment_padding_side);
++        final int paddingBottom = res.getDimensionPixelSize(
++                com.android.internal.R.dimen.preference_fragment_padding_bottom);
++
++        list.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
++        list.setPadding(paddingSide, 0, paddingSide, paddingBottom);
++    }
++}
+diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java	1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java	2014-02-18 06:34:40.508413198 +0000
+@@ -0,0 +1,4 @@
++package com.android.settings.cyanogenmod.superuser;
++
++public class RequestActivity extends com.koushikdutta.superuser.RequestActivity {
++}
++
+diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java	1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java	2014-02-18 06:34:40.520413105 +0000
+@@ -0,0 +1,4 @@
++package com.android.settings.cyanogenmod.superuser;
++
++public class SuReceiver extends com.koushikdutta.superuser.SuReceiver {
++}
++
