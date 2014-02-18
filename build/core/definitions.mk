@@ -29,6 +29,6 @@ expand-required-modules-old=$(value expand-required-modules-old)
 ## The new expand-required-modules filters out any
 ## Packages defined by PRODUCT_PACKAGES_FILTER
 define expand-required-modules
-$(call _expand-required-modules-old,$(1),$(2))\
+$(call expand-required-modules-old,$(1),$(2))\
 $(eval $(1) := $(filter-out $(PRODUCT_PACKAGES_FILTER),$($(1))))
 endef
