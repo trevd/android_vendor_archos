@@ -1,0 +1,794 @@
+diff -ruN frameworks/native/include/ui/PixelFormat.h frameworks/native/include/ui/PixelFormat.h
+--- frameworks/native/include/ui/PixelFormat.h	2013-12-27 21:17:16.366807101 +0000
++++ frameworks/native/include/ui/PixelFormat.h	2013-12-27 15:03:38.063012958 +0000
+@@ -69,6 +69,7 @@
+ 
+ ssize_t bytesPerPixel(PixelFormat format);
+ ssize_t bitsPerPixel(PixelFormat format);
++unsigned int minColorDepth(PixelFormat format);
+ 
+ }; // namespace android
+ 
+diff -ruN frameworks/native/libs/ui/FramebufferNativeWindow.cpp frameworks/native/libs/ui/FramebufferNativeWindow.cpp
+--- frameworks/native/libs/ui/FramebufferNativeWindow.cpp	2013-12-27 21:17:16.374807100 +0000
++++ frameworks/native/libs/ui/FramebufferNativeWindow.cpp	2013-12-27 15:03:38.063012958 +0000
+@@ -80,7 +80,12 @@
+         int stride;
+         int err;
+         int i;
+-        err = framebuffer_open(module, &fbDev);
++#ifdef OMAP_ENHANCEMENT
++        // by default we use FB0 for command line GL apps
++        err = framebuffer_open(module, &fbDev, GRALLOC_HARDWARE_FB0);
++#else
++         err = framebuffer_open(module, &fbDev);
++#endif  
+         ALOGE_IF(err, "couldn't open framebuffer HAL (%s)", strerror(-err));
+         
+         err = gralloc_open(module, &grDev);
+diff -ruN frameworks/native/libs/ui/PixelFormat.cpp frameworks/native/libs/ui/PixelFormat.cpp
+--- frameworks/native/libs/ui/PixelFormat.cpp	2013-12-27 21:17:16.374807100 +0000
++++ frameworks/native/libs/ui/PixelFormat.cpp	2013-12-27 15:03:38.071012958 +0000
+@@ -37,6 +37,21 @@
+     return BAD_VALUE;
+ }
+ 
++unsigned int minColorDepth(PixelFormat format) {
++    switch (format) {
++        case PIXEL_FORMAT_RGBA_8888:
++        case PIXEL_FORMAT_RGBX_8888:
++        case PIXEL_FORMAT_BGRA_8888:
++        case PIXEL_FORMAT_RGB_888:
++            return 8;
++        case PIXEL_FORMAT_RGB_565:
++        case PIXEL_FORMAT_RGBA_5551:
++            return 5;
++        case PIXEL_FORMAT_RGBA_4444:
++            return 4;
++    }
++    return BAD_VALUE;
++}
+ ssize_t bitsPerPixel(PixelFormat format) {
+     switch (format) {
+         case PIXEL_FORMAT_RGBA_8888:
+diff -ruN frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
+diff -ruN frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
+--- frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp	2014-02-18 03:32:21.008742058 +0000
++++ frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp	2014-02-18 03:32:12.936800169 +0000
+@@ -214,13 +214,20 @@
+         const sp<SurfaceFlinger>& flinger,
+         EventHandler& handler)
+     : mFlinger(flinger),
+-      mFbDev(0), mHwc(0), mNumDisplays(1),
++      mFbDev(0),
++#ifdef OMAP_ENHANCEMENT
++      mFbDev2(0),
++#endif 
++		mHwc(0), mNumDisplays(1),
+       mCBContext(new cb_context),
+       mEventHandler(handler),
+       mDebugForceFakeVSync(false)
+ {
+     for (size_t i =0 ; i<MAX_HWC_DISPLAYS ; i++) {
+         mLists[i] = 0;
++#ifdef OMAP_ENHANCEMENT
++        mListsExt[i] = NULL;
++#endif     
+     }
+ 
+     for (size_t i=0 ; i<HWC_NUM_PHYSICAL_DISPLAY_TYPES ; i++) {
+@@ -237,7 +244,11 @@
+     // Note: some devices may insist that the FB HAL be opened before HWC.
+     int fberr = loadFbHalModule();
+     loadHwcModule();
+-
++	
++#ifdef OMAP_ENHANCEMENT
++    // FB HAL must stay open independent of HWC API version. Closing FB HAL will
++    // result in destruction of flip chain and de-allocation of framebuffer.
++#else
+     if (mFbDev && mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
+         // close FB HAL if we don't needed it.
+         // FIXME: this is temporary until we're not forced to open FB HAL
+@@ -245,7 +256,8 @@
+         framebuffer_close(mFbDev);
+         mFbDev = NULL;
+     }
+-
++	
++#endif
+     // If we have no HWC, or a pre-1.1 HWC, an FB dev is mandatory.
+     if ((!mHwc || !hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1))
+             && !mFbDev) {
+@@ -269,6 +281,9 @@
+                 mCBContext->hwc = this;
+                 mCBContext->procs.invalidate = &hook_invalidate;
+                 mCBContext->procs.vsync = &hook_vsync;
++#ifdef OMAP_ENHANCEMENT
++            mCBContext->procs.extension_cb = &hook_extension_cb;
++#endif
+                 if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1))
+                     mCBContext->procs.hotplug = &hook_hotplug;
+                 else
+@@ -290,6 +305,9 @@
+                  mCBContext->hwc = this;
+                  mCBContext->procs.invalidate = &hook_invalidate;
+                  mCBContext->procs.vsync = &hook_vsync;
++#ifdef OMAP_ENHANCEMENT
++            mCBContext->procs.extension_cb = &hook_extension_cb;
++#endif
+                  if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1))
+                     mCBContext->procs.hotplug = &hook_hotplug;
+                 else
+@@ -335,8 +353,12 @@
+             mNumDisplays = 1;
+         }
+     }
+-
+-    if (mFbDev) {
++	
++#ifdef OMAP_ENHANCEMENT
++    if (!mHwc || !hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
++#else
++     if (mFbDev) {
++#endif
+         ALOG_ASSERT(!(mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)),
+                 "should only have fbdev if no hwc or hwc is 1.0");
+ 
+@@ -382,6 +404,12 @@
+     if (mFbDev) {
+         framebuffer_close(mFbDev);
+     }
++#ifdef OMAP_ENHANCEMENT
++    // we have second FB for HWCv1.1
++    if (mFbDev2) {
++        framebuffer_close(mFbDev2);
++    }
++#endif  
+     delete mCBContext;
+ }
+ 
+@@ -431,7 +459,24 @@
+         return err;
+     }
+ 
+-    return framebuffer_open(module, &mFbDev);
++#ifdef OMAP_ENHANCEMENT
++   err = framebuffer_open(module, &mFbDev, "fb0");
++    if (err) {
++        ALOGE("framebuffer_open failed for fb0 (%s)", strerror(-err));
++        return err;
++    }
++    // open the second fb device, as we continue to use FB HAL
++    // for HWCv1.1 support.
++    // FIXME: get away with FB HAL.
++    err = framebuffer_open(module, &mFbDev2, "fb1");
++    if (err) {
++       ALOGE("framebuffer_open for fb1 failed (%s)", strerror(-err));
++        return err;
++    }
++    return err;
++#else
++     return framebuffer_open(module, &mFbDev);
++#endif
+ }
+ 
+ status_t HWComposer::initCheck() const {
+@@ -457,6 +502,61 @@
+             const_cast<hwc_procs_t*>(procs));
+     ctx->hwc->hotplug(disp, connected);
+ }
++#ifdef OMAP_ENHANCEMENT
++int HWComposer::hook_extension_cb(struct hwc_procs* procs, int operation,
++        void** data, int size) {
++    int rv = -1;
++    switch (operation) {
++    case HWC_EXTENDED_OP_LAYERSTACK:
++        if (size != sizeof(hwc_layer_stack_t))
++            return -1;
++        rv = reinterpret_cast<cb_context *>(procs)->hwc->extendedApiLayerStack((hwc_layer_stack_t*)*data);
++        break;
++    case HWC_EXTENDED_OP_DISPLAYINFO:
++        if (size != sizeof(hwc_display_info_t))
++            return -1;
++        rv = reinterpret_cast<cb_context *>(procs)->hwc->extendedApiDisplayInfo((hwc_display_info_t*)*data);
++    case HWC_EXTENDED_OP_LAYERDATA:
++        if (size == -1)
++            return 0;
++        if (size != sizeof(hwc_layer_extended_t))
++            return -1;
++        rv = reinterpret_cast<cb_context *>(procs)->hwc->extendedApiLayerData((hwc_layer_extended_t*)*data);
++        break;
++    }
++    return rv;
++}
++
++int HWComposer::extendedApiLayerStack(hwc_layer_stack* param) {
++    uint32_t dpy = param->dpy;
++    if (dpy > 31 || !mAllocatedDisplayIDs.hasBit(dpy))
++        return BAD_INDEX;
++    param->stack = mDisplayData[dpy].layerStack;
++    return NO_ERROR;
++}
++
++int HWComposer::extendedApiDisplayInfo(hwc_display_info* param) {
++    uint32_t dpy = param->dpy;
++    if (dpy > 31 || !mAllocatedDisplayIDs.hasBit(dpy))
++        return BAD_INDEX;
++    param->width = mDisplayData[dpy].width;
++    param->height = mDisplayData[dpy].height;
++    return NO_ERROR;
++}
++
++int HWComposer::extendedApiLayerData(hwc_layer_extended* linfo) {
++    uint32_t idx = linfo->idx;
++    uint32_t dpy = linfo->dpy;
++    if (uint32_t(dpy)>31 || !mAllocatedDisplayIDs.hasBit(dpy))
++        return -1;
++    if (idx >= mListsExt[dpy]->numHwLayers)
++        return -1;
++    *linfo = mListsExt[dpy]->hwLayers[idx];
++    linfo->idx = idx;
++    linfo->dpy = dpy;
++    return 0;
++}
++#endif
+ 
+ void HWComposer::invalidate() {
+     mFlinger->repaintEverything();
+@@ -563,7 +663,12 @@
+     }
+ 
+     // FIXME: what should we set the format to?
+-    mDisplayData[disp].format = HAL_PIXEL_FORMAT_RGBA_8888;
++#ifdef OMAP_ENHANCEMENT
++    // Use pixel format native to DSS HW
++    mDisplayData[disp].format = HAL_PIXEL_FORMAT_BGRA_8888;
++#else
++     mDisplayData[disp].format = HAL_PIXEL_FORMAT_RGBA_8888;
++#endif
+     mDisplayData[disp].connected = true;
+     if (mDisplayData[disp].xdpi == 0.0f || mDisplayData[disp].ydpi == 0.0f) {
+         float dpi = getDefaultDensity(h);
+@@ -766,6 +871,11 @@
+             free(disp.list);
+             disp.list = (hwc_display_contents_1_t*)malloc(size);
+             disp.capacity = numLayers;
++#ifdef OMAP_ENHANCEMENT
++            free(disp.listExt);
++            size = sizeof(hwc_layer_list_extended_t) + numLayers * sizeof(hwc_layer_extended_t);
++           disp.listExt = (hwc_layer_list_extended_t*)malloc(size);
++#endif
+         }
+         if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
+             disp.framebufferTarget = &disp.list->hwLayers[numLayers - 1];
+@@ -798,16 +908,41 @@
+             disp.list->retireFenceFd = -1;
+         }
+         hwcFlags(mHwc, disp.list) = HWC_GEOMETRY_CHANGED;
++#ifdef OMAP_ENHANCEMENT
++        disp.list->flags |= HWC_EXTENDED_API;
++        disp.layerStack = 0;
++        disp.listExt->numHwLayers = numLayers;
++#endif 
+         hwcNumHwLayers(mHwc, disp.list) = numLayers;
+ #else
+         disp.list->retireFenceFd = -1;
+         disp.list->flags = HWC_GEOMETRY_CHANGED;
++#ifdef OMAP_ENHANCEMENT
++        disp.list->flags |= HWC_EXTENDED_API;
++        disp.layerStack = 0;
++        disp.listExt->numHwLayers = numLayers;
++#endif 
+         disp.list->numHwLayers = numLayers;
+ #endif
+     }
+     return NO_ERROR;
+ }
++#ifdef OMAP_ENHANCEMENT
++status_t HWComposer::setLayerStack(int32_t id, uint32_t stack) {
++    if (uint32_t(id)>31 || !mAllocatedDisplayIDs.hasBit(id)) {
++       return BAD_INDEX;
++    }
++ 
++    DisplayData& disp(mDisplayData[id]);
++    if (!disp.list) {
++        return BAD_INDEX;
++    }
+ 
++    disp.layerStack = stack;
++
++    return NO_ERROR;
++}
++#endif
+ status_t HWComposer::setFramebufferTarget(int32_t id,
+         const sp<Fence>& acquireFence, const sp<GraphicBuffer>& buf) {
+     if (uint32_t(id)>31 || !mAllocatedDisplayIDs.hasBit(id)) {
+@@ -854,6 +989,9 @@
+ #endif
+         }
+         mLists[i] = disp.list;
++#ifdef OMAP_ENHANCEMENT
++        mListsExt[i] = disp.listExt;
++#endif   
+         if (mLists[i]) {
+             if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_3)) {
+                 mLists[i]->outbuf = disp.outbufHandle;
+@@ -1116,7 +1254,12 @@
+         // FIXME: temporary hack until HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED
+         // is supported by the implementation. we can only be in this case
+         // if we have HWC 1.1
+-        return HAL_PIXEL_FORMAT_RGBA_8888;
++ #ifdef OMAP_ENHANCEMENT
++        // Use pixel format native to DSS HW
++        return HAL_PIXEL_FORMAT_BGRA_8888;
++#else
++         return HAL_PIXEL_FORMAT_RGBA_8888;
++#endif
+         //return HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+     } else {
+         return mFbDev->format;
+@@ -1186,8 +1329,19 @@
+ protected:
+     HWCTYPE* const mLayerList;
+     HWCTYPE* mCurrentLayer;
+-    Iterable(HWCTYPE* layer) : mLayerList(layer), mCurrentLayer(layer) { }
++#ifdef OMAP_ENHANCEMENT
++    hwc_layer_extended_t* const mLayerListExt;
++    hwc_layer_extended_t* mCurrentLayerExt;
++    Iterable(HWCTYPE* layer, hwc_layer_extended_t* layerExt) : mLayerList(layer),
++            mCurrentLayer(layer), mLayerListExt(layerExt), mCurrentLayerExt(layerExt) { }
++#else  
++     Iterable(HWCTYPE* layer) : mLayerList(layer), mCurrentLayer(layer) { }
++#endif
+     inline HWCTYPE const * getLayer() const { return mCurrentLayer; }
++#ifdef OMAP_ENHANCEMENT
++    inline hwc_layer_extended_t const * getLayerExt() const { return mCurrentLayerExt; }
++    inline hwc_layer_extended_t* getLayerExt() { return mCurrentLayerExt; }
++#endif         
+     inline HWCTYPE* getLayer() { return mCurrentLayer; }
+     virtual ~Iterable() { }
+ private:
+@@ -1197,6 +1351,9 @@
+     }
+     virtual status_t setLayer(size_t index) {
+         mCurrentLayer = &mLayerList[index];
++#ifdef OMAP_ENHANCEMENT
++        mCurrentLayerExt = &mLayerListExt[index];
++#endif                
+         return NO_ERROR;
+     }
+ };
+@@ -1342,9 +1499,13 @@
+ class HWCLayerVersion1 : public Iterable<HWCLayerVersion1, hwc_layer_1_t> {
+     struct hwc_composer_device_1* mHwc;
+ public:
+-    HWCLayerVersion1(struct hwc_composer_device_1* hwc, hwc_layer_1_t* layer)
+-        : Iterable<HWCLayerVersion1, hwc_layer_1_t>(layer), mHwc(hwc) { }
+-
++#ifdef OMAP_ENHANCEMENT
++    HWCLayerVersion1(struct hwc_composer_device_1* hwc, hwc_layer_1_t* layer, hwc_layer_extended_t* layerExt)
++        : Iterable<HWCLayerVersion1, hwc_layer_1_t>(layer, layerExt), mHwc(hwc) { }
++#else 
++     HWCLayerVersion1(struct hwc_composer_device_1* hwc, hwc_layer_1_t* layer)
++         : Iterable<HWCLayerVersion1, hwc_layer_1_t>(layer), mHwc(hwc) { }
++#endif
+     virtual int32_t getCompositionType() const {
+         return getLayer()->compositionType;
+     }
+@@ -1359,6 +1520,11 @@
+     virtual void setAcquireFenceFd(int fenceFd) {
+         getLayer()->acquireFenceFd = fenceFd;
+     }
++#ifdef OMAP_ENHANCEMENT
++    virtual void setIdentity(uint32_t identity) {
++        getLayerExt()->identity = identity;
++    }
++#endif 
+     virtual void setPerFrameDefaultState() {
+         //getLayer()->compositionType = HWC_FRAMEBUFFER;
+     }
+@@ -1484,7 +1650,11 @@
+     if (!mHwc || !disp.list || index > disp.list->numHwLayers) {
+         return LayerListIterator();
+     }
+-    return LayerListIterator(new HWCLayerVersion1(mHwc, disp.list->hwLayers), index);
++#ifdef OMAP_ENHANCEMENT
++	 return LayerListIterator(new HWCLayerVersion1(mHwc, disp.list->hwLayers, disp.listExt->hwLayers), index);
++#else
++	return LayerListIterator(new HWCLayerVersion1(mHwc, disp.list->hwLayers), index);
++#endif
+ #endif
+ }
+ 
+@@ -1684,6 +1854,9 @@
+     connected(false),
+     hasFbComp(false), hasOvComp(false),
+     capacity(0), list(NULL),
++#ifdef OMAP_ENHANCEMENT
++    listExt(NULL), layerStack(0),
++#endif 
+     framebufferTarget(NULL), fbTargetHandle(0),
+     lastRetireFence(Fence::NO_FENCE), lastDisplayFence(Fence::NO_FENCE),
+     outbufHandle(NULL), outbufAcquireFence(Fence::NO_FENCE),
+diff -ruN frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.h frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.h
+--- frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.h	2013-12-27 21:17:16.414807100 +0000
++++ frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.h	2013-12-27 21:01:34.518815749 +0000
+@@ -40,6 +40,12 @@
+ struct hwc_display_contents_1;
+ struct hwc_layer_1;
+ struct hwc_procs;
++#ifdef OMAP_ENHANCEMENT
++struct hwc_layer_stack;
++struct hwc_display_info;
++struct hwc_layer_extended;
++struct hwc_layer_list_extended;
++#endif
+ struct framebuffer_device_t;
+ 
+ namespace android {
+@@ -107,6 +113,11 @@
+ 
+     // create a work list for numLayers layer. sets HWC_GEOMETRY_CHANGED.
+     status_t createWorkList(int32_t id, size_t numLayers);
++	
++	
++#ifdef OMAP_ENHANCEMENT
++    status_t setLayerStack(int32_t id, uint32_t stack);
++#endif  
+ 
+     bool supportsFramebufferTarget() const;
+ 
+@@ -157,6 +168,9 @@
+         virtual int32_t getCompositionType() const = 0;
+         virtual uint32_t getHints() const = 0;
+         virtual sp<Fence> getAndResetReleaseFence() = 0;
++#ifdef OMAP_ENHANCEMENT
++        virtual void setIdentity(uint32_t identity) = 0;
++#endif 
+         virtual void setDefaultState() = 0;
+         virtual void setSkip(bool skip) = 0;
+         virtual void setBlending(uint32_t blending) = 0;
+@@ -294,7 +308,14 @@
+             int64_t timestamp);
+     static void hook_hotplug(const struct hwc_procs* procs, int disp,
+             int connected);
+-
++			
++#ifdef OMAP_ENHANCEMENT
++    static int hook_extension_cb(struct hwc_procs* procs, int operation,
++            void** data, int size);
++    int extendedApiLayerStack(hwc_layer_stack* param);
++    int extendedApiDisplayInfo(hwc_display_info* param);
++    int extendedApiLayerData(hwc_layer_extended* linfo);
++#endif
+     inline void invalidate();
+     inline void vsync(int disp, int64_t timestamp);
+     inline void hotplug(int disp, int connected);
+@@ -319,6 +340,10 @@
+         bool hasOvComp;
+         size_t capacity;
+         hwc_display_contents_1* list;
++#ifdef OMAP_ENHANCEMENT
++        hwc_layer_list_extended* listExt;
++        uint32_t layerStack;        
++#endif  
+         hwc_layer_1* framebufferTarget;
+         buffer_handle_t fbTargetHandle;
+         sp<Fence> lastRetireFence;  // signals when the last set op retires
+@@ -333,11 +358,20 @@
+ 
+     sp<SurfaceFlinger>              mFlinger;
+     framebuffer_device_t*           mFbDev;
++#ifdef OMAP_ENHANCEMENT
++    // we still use FB HAL to do composition, so
++    // creating one more fb instance for HWCv1.1
++    // FIXME: remove FB HAL.
++    framebuffer_device_t*           mFbDev2;
++#endif        
+     struct hwc_composer_device_1*   mHwc;
+     // invariant: mLists[0] != NULL iff mHwc != NULL
+     // mLists[i>0] can be NULL. that display is to be ignored
+     struct hwc_display_contents_1*  mLists[MAX_HWC_DISPLAYS];
+     DisplayData                     mDisplayData[MAX_HWC_DISPLAYS];
++#ifdef OMAP_ENHANCEMENT
++    hwc_layer_list_extended*        mListsExt[MAX_HWC_DISPLAYS];
++#endif   
+     size_t                          mNumDisplays;
+ 
+     cb_context*                     mCBContext;
+diff -ruN frameworks/native/services/surfaceflinger/Layer.cpp frameworks/native/services/surfaceflinger/Layer.cpp
+--- frameworks/native/services/surfaceflinger/Layer.cpp	2013-12-27 21:17:16.418807100 +0000
++++ frameworks/native/services/surfaceflinger/Layer.cpp	2013-12-27 20:57:58.750817730 +0000
+@@ -48,6 +48,10 @@
+ 
+ #define DEBUG_RESIZE    0
+ 
++#ifdef OMAP_ENHANCEMENT
++static int32_t sIdentity = 1;
++#endif
++
+ namespace android {
+ 
+ // ---------------------------------------------------------------------------
+@@ -65,6 +69,7 @@
+         mDebug(false),
+         mFormat(PIXEL_FORMAT_NONE),
+         mOpaqueLayer(true),
++		  mNeedsDithering(false),
+         mTransactionFlags(0),
+         mQueuedFrames(0),
+         mCurrentTransform(0),
+@@ -79,6 +84,9 @@
+         mProtectedByApp(false),
+         mHasSurface(false),
+         mClientRef(client)
++#ifdef OMAP_ENHANCEMENT
++        ,mIdentity(uint32_t(android_atomic_inc(&sIdentity)))
++#endif
+ {
+     mCurrentCrop.makeInvalid();
+     mFlinger->getRenderEngine().genTextures(1, &mTextureName);
+@@ -195,7 +203,13 @@
+     mSurfaceFlingerConsumer->setDefaultBufferSize(w, h);
+     mSurfaceFlingerConsumer->setDefaultBufferFormat(format);
+     mSurfaceFlingerConsumer->setConsumerUsageBits(getEffectiveUsage(0));
+-
++	
++	if (mFlinger->getUseDithering()) {
++         int displayMinColorDepth = mFlinger->getMinColorDepth();
++        int layerMinColorDepth = minColorDepth(format);
++        mNeedsDithering = (layerMinColorDepth > displayMinColorDepth);
++    }
++ 
+     return NO_ERROR;
+ }
+ 
+@@ -252,6 +266,11 @@
+     return crop;
+ }
+ 
++#ifdef OMAP_ENHANCEMENT
++void Layer::setIdentity(HWComposer::HWCLayerInterface& layer) {
++    layer.setIdentity(mIdentity);
++}
++#endif
+ static Rect reduce(const Rect& win, const Region& exclude) {
+     if (CC_LIKELY(exclude.isEmpty())) {
+         return win;
+@@ -550,6 +569,7 @@
+ {
+     RenderEngine& engine(mFlinger->getRenderEngine());
+     computeGeometry(hw, mMesh);
++	engine.setDither(false);
+     engine.setupFillWithColor(red, green, blue, alpha);
+     engine.drawMesh(mMesh);
+ }
+@@ -596,6 +616,7 @@
+     texCoords[3] = vec2(right, 1.0f - top);
+ 
+     RenderEngine& engine(mFlinger->getRenderEngine());
++	engine.setDither(needsDithering());
+     engine.setupLayerBlending(mPremultipliedAlpha, isOpaque(), s.alpha);
+     engine.drawMesh(mMesh);
+     engine.disableBlending();
+diff -ruN frameworks/native/services/surfaceflinger/Layer.h frameworks/native/services/surfaceflinger/Layer.h
+--- frameworks/native/services/surfaceflinger/Layer.h	2013-12-27 21:17:16.418807100 +0000
++++ frameworks/native/services/surfaceflinger/Layer.h	2013-12-27 20:53:16.178820325 +0000
+@@ -146,12 +146,20 @@
+     // Virtuals
+ 
+     virtual const char* getTypeId() const { return "Layer"; }
++#ifdef OMAP_ENHANCEMENT
++    virtual void setIdentity(HWComposer::HWCLayerInterface& layer);
++#endif
+ 
+     /*
+      * isOpaque - true if this surface is opaque
+      */
+     virtual bool isOpaque() const;
+-
++	 
++	 /*
++     * needsDithering - true if this surface needs dithering
++     */
++	 virtual bool needsDithering() const     { return mNeedsDithering; }
++ 
+     /*
+      * isSecure - true if this surface is secure, that is if it prevents
+      * screenshots or VNC servers.
+@@ -336,6 +344,8 @@
+     mutable bool mDebug;
+     PixelFormat mFormat;
+     bool mOpaqueLayer;
++	 
++	 bool mNeedsDithering;
+ 
+     // these are protected by an external lock
+     State mCurrentState;
+@@ -371,7 +381,10 @@
+     mutable Mutex mLock;
+     // Set to true once we've returned this surface's handle
+     mutable bool mHasSurface;
+-    const wp<Client> mClientRef;
++	 const wp<Client> mClientRef;
++#ifdef OMAP_ENHANCEMENT
++    const uint32_t mIdentity;
++#endif 
+ };
+ 
+ // ---------------------------------------------------------------------------
+diff -ruN frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.cpp frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.cpp
+--- frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.cpp	2013-12-27 21:17:16.418807100 +0000
++++ frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.cpp	2013-12-27 20:50:57.122821602 +0000
+@@ -204,6 +204,13 @@
+ void RenderEngine::readPixels(size_t l, size_t b, size_t w, size_t h, uint32_t* pixels) {
+     glReadPixels(l, b, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+ }
++void RenderEngine::setDither(bool dither) {
++    if (dither) {
++        glEnable(GL_DITHER);
++    } else {
++        glDisable(GL_DITHER);
++    }
++}
+ 
+ void RenderEngine::dump(String8& result) {
+     const GLExtensions& extensions(GLExtensions::getInstance());
+@@ -214,8 +221,42 @@
+     result.appendFormat("%s\n", extensions.getExtension());
+ }
+ 
++#ifdef OMAP_ENHANCEMENT
+ // ---------------------------------------------------------------------------
++RenderEngine::BindFramebuffer::BindFramebuffer(RenderEngine& engine,uint32_t reqWidth, uint32_t reqHeight) : mEngine(engine)
++{
++   mReqWidth = reqWidth ;
++   mReqHeight = reqHeight ;
++	glGenRenderbuffersOES(1, &mTexName);
++    glBindRenderbufferOES(GL_RENDERBUFFER_OES, mTexName);
++    glRenderbufferStorageOES(GL_RENDERBUFFER_OES, GL_RGBA8_OES, mReqWidth, mReqHeight);
++
++    // create a FBO
++    GLuint name;
++    glGenFramebuffersOES(1, &mFbName);
++    glBindFramebufferOES(GL_FRAMEBUFFER_OES, mFbName);
++    glFramebufferRenderbufferOES(GL_FRAMEBUFFER_OES,
++            GL_COLOR_ATTACHMENT0_OES, GL_RENDERBUFFER_OES, mTexName);
++
++    mStatus = glCheckFramebufferStatusOES(GL_FRAMEBUFFER_OES);
++
++    ALOGE_IF(mStatus != GL_FRAMEBUFFER_COMPLETE_OES,
++            "glCheckFramebufferStatusOES error %d", mStatus);
++}
++
++RenderEngine::BindFramebuffer::~BindFramebuffer() {
++	// back to main framebuffer
++	ALOGI("Destroying Framebuffer");
++    glBindFramebufferOES(GL_FRAMEBUFFER_OES, 0);
++    glDeleteRenderbuffersOES(1, &mTexName);
++    glDeleteFramebuffersOES(1, &mFbName);
++}
++
++status_t RenderEngine::BindFramebuffer::getStatus() const {
++    return mStatus == GL_FRAMEBUFFER_COMPLETE_OES ? NO_ERROR : BAD_VALUE;
++}
+ 
++#endif
+ RenderEngine::BindImageAsFramebuffer::BindImageAsFramebuffer(
+         RenderEngine& engine, EGLImageKHR image) : mEngine(engine)
+ {
+diff -ruN frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.h frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.h
+--- frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.h	2013-12-27 21:17:16.418807100 +0000
++++ frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.h	2013-12-27 20:50:34.698821808 +0000
+@@ -71,7 +71,20 @@
+     void genTextures(size_t count, uint32_t* names);
+     void deleteTextures(size_t count, uint32_t const* names);
+     void readPixels(size_t l, size_t b, size_t w, size_t h, uint32_t* pixels);
+-
++	 
++	 void setDither(bool dither);
++#ifdef OMAP_ENHANCEMENT
++	class BindFramebuffer {
++        RenderEngine& mEngine;
++        uint32_t mTexName, mFbName;
++		  uint32_t mReqWidth, mReqHeight;
++        uint32_t mStatus;
++    public:
++        BindFramebuffer(RenderEngine& engine, uint32_t reqWidth, uint32_t reqHeight);
++        ~BindFramebuffer();
++        int getStatus() const;
++    };
++#endif
+     class BindImageAsFramebuffer {
+         RenderEngine& mEngine;
+         uint32_t mTexName, mFbName;
+diff -ruN frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+--- frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp	2013-12-27 21:17:16.418807100 +0000
++++ frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp	2013-12-27 20:46:33.686824021 +0000
+@@ -2990,9 +2990,14 @@
+     ANativeWindow* window = sur.get();
+ 
+     status_t result = NO_ERROR;
++#ifdef OMAP_ENHANCEMENT
++	if (native_window_api_connect(window, NATIVE_WINDOW_API_CPU) == NO_ERROR) {
++        uint32_t usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN ;
++#else
+     if (native_window_api_connect(window, NATIVE_WINDOW_API_EGL) == NO_ERROR) {
+         uint32_t usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN |
+                         GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE;
++#endif
+ 
+         int err = 0;
+         err = native_window_set_buffers_dimensions(window, reqWidth, reqHeight);
+@@ -3007,6 +3012,19 @@
+              */
+             result = native_window_dequeue_buffer_and_wait(window,  &buffer);
+             if (result == NO_ERROR) {
++#ifdef OMAP_ENHANCEMENT
++					RenderEngine::BindFramebuffer fbBond(getRenderEngine(), reqWidth,reqHeight);
++				   if (fbBond.getStatus() == NO_ERROR) {
++						renderScreenImplLocked(hw, reqWidth, reqHeight, minLayerZ, maxLayerZ, true);
++						sp<GraphicBuffer> buf = static_cast<GraphicBuffer*>(buffer);
++                    void* vaddr;
++                    if (buf->lock(GRALLOC_USAGE_SW_WRITE_OFTEN, &vaddr) == NO_ERROR) {
++                        getRenderEngine().readPixels(0, 0, buffer->stride, reqHeight, (uint32_t*)vaddr);
++                        buf->unlock();
++                    }
++                    window->queueBuffer(window, buffer, -1);
++				   }
++#else
+                 // create an EGLImage from the buffer so we can later
+                 // turn it into a texture
+                 EGLImageKHR image = eglCreateImageKHR(mEGLDisplay, EGL_NO_CONTEXT,
+@@ -3061,12 +3079,18 @@
+                 } else {
+                     result = BAD_VALUE;
+                 }
++#endif
+                 window->queueBuffer(window, buffer, -1);
+             }
+         } else {
+             result = BAD_VALUE;
+         }
+-        native_window_api_disconnect(window, NATIVE_WINDOW_API_EGL);
++ 		  native_window_api_disconnect(window,
++#ifdef OMAP_ENHANCEMENT
++		 NATIVE_WINDOW_API_CPU);
++#else
++        NATIVE_WINDOW_API_EGL);
++#endif
+     }
+ 
+     return result;
+diff -ruN frameworks/native/services/surfaceflinger/SurfaceFlinger.h frameworks/native/services/surfaceflinger/SurfaceFlinger.h
+--- frameworks/native/services/surfaceflinger/SurfaceFlinger.h	2013-12-27 21:17:16.418807100 +0000
++++ frameworks/native/services/surfaceflinger/SurfaceFlinger.h	2013-12-27 20:43:45.570825565 +0000
+@@ -323,7 +323,9 @@
+         EGLint renderableType, EGLConfig* config);
+     size_t getMaxTextureSize() const;
+     size_t getMaxViewportDims() const;
+-
++	
++	 uint32_t getMinColorDepth() const { return mMinColorDepth; }
++	 inline int getUseDithering() const { return mUseDithering; }
+     /* ------------------------------------------------------------------------
+      * Display and layer stack management
+      */
+@@ -430,6 +432,7 @@
+     sp<EventThread> mEventThread;
+     sp<EventThread> mSFEventThread;
+     sp<EventControlThread> mEventControlThread;
++	 uint32_t mMinColorDepth;
+     EGLContext mEGLContext;
+     EGLConfig mEGLConfig;
+     EGLDisplay mEGLDisplay;
+@@ -448,6 +451,7 @@
+     DefaultKeyedVector< wp<IBinder>, sp<DisplayDevice> > mDisplays;
+ 
+     // don't use a lock for these, we don't care
++	 int mUseDithering;
+     int mDebugRegion;
+     int mDebugDDMS;
+     int mDebugDisableHWC;
+
