@@ -24,7 +24,8 @@
 
 ## Stash the old expand-required-modules recipe before
 ## defining a new one.
-expand-required-modules-old=$(value expand-required-modules-old)
+define expand-required-modules-old=$(value expand-required-modules-old)
+endef
 
 ## The new expand-required-modules filters out any
 ## Packages defined by PRODUCT_PACKAGES_FILTER
