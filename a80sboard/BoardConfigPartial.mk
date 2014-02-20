@@ -32,3 +32,8 @@ COMMON_GLOBAL_CFLAGS += -DOMAP_ENHANCEMENT_S3D
 
 USES_TI_MAC80211 := true
 COMMON_GLOBAL_CFLAGS += -DUSES_TI_MAC80211
+
+# A cheeky bit of odexing for faster boot times 
+ifeq ($(HOST_OS),linux)
+WITH_DEXPREOPT := true
+endif
