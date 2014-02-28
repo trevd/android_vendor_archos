@@ -1,0 +1,83 @@
+OmniRom Archos G9 A80S in 6 Steps
+==============================================================
+
+1. http://source.android.com/source/initializing.html
+2. http://source.android.com/source/downloading.html 
+2. https://github.com/omnirom/android
+3. curl -L http://goo.gl/B4Yuab > vendorinit.sh
+4. sudo chmod 755 vendorinit.sh
+5. source vendorinit.sh
+6. make -j16 otapackage
+
+
+===============================================================
+
+vendor/archos
+=============
+
+This is base camp for building OmniRom for the Archos G9 A80S 
+
+
+Initializing The OmniRom Build Environment for Archos Devices
+=============================================================
+
+1. Complete the steps outlined @
+http://source.android.com/source/initializing.html
+
+2. Complete the Installing Repo Section @
+http://source.android.com/source/downloading.html 
+
+3. Run  
+repo init -u git://github.com/omnirom/android.git -b android-4.4
+repo sync
+
+4. Use the omnirom vendorinit.sh to complete the rest of the archos
+specific steps
+
+a) curl -L http://goo.gl/B4Yuab > vendorinit.sh
+b) chmod 755 vendorinit.sh
+c) source vendorinit.sh
+
+vendorinit.sh
+=============
+The vendorinit.sh script carries out the following actions.
+
+1. Creates .repo/local_manifests/archos-omni.xml which
+a) add trevd, CyanogenMod and linaro remote respoisitories
+b) add the vendor/archos project
+c) add the device/archos/a80sboard project
+d) remove android_hardware_ti_omap4xxx project as it is not required
+e) remove platform/hardware/ti/wlan project which is replaced with an
+   archos specific version
+f) remove platform/hardware/ti/wpan project which is replaced with an
+   archos specific version
+2. repo sync's vendor/archos and device/archos/a80sboard
+3. setup the build environment via build/envsetup.sh
+4. remove old .repo/local_manifest/roomservice.xml
+5. rest various projects which are affected by additional patches
+6. run lunch omni_a80sdebug which
+a) creates a new roomservice.xml based on device/archos/a80sboard/omni.dependencies
+b) sets up the environment ready for compiling
+7. resync all projects [ optional ]
+8. apply patches to the following projects
+a) system/* - enable building with clang
+b) packages/inputmethods/hackerskeyboard - remove launcher icon
+c) frameworks/native - add omap enhancements to surfaceflinger
+d) hardware/libhardware - add omap enhancements to framebuffer and hwcomposer
+e) packages/apps/Settings - embed koush's superuser
+9) remove system/extras/su which is replaced by external/koush/Superuser/Superuser/jni/su
+
+
+
+Building and Running
+====================
+
+make -j4 otapackage
+
+
+Additional information can be found @ http://source.android.com/source/building-running.html 
+
+choose "aosp_a80sboard-userdebug" from the lunch menu
+
+
+
