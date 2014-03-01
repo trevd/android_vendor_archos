@@ -148,7 +148,7 @@ diff -ruN packages/apps/Settings/proguard.flags packages/apps/Settings/proguard.
 diff -ruN packages/apps/Settings/res/xml/settings_headers.xml packages/apps/Settings/res/xml/settings_headers.xml
 --- packages/apps/Settings/res/xml/settings_headers.xml	2014-02-18 06:49:43.253495407 +0000
 +++ packages/apps/Settings/res/xml/settings_headers.xml	2014-02-18 06:34:43.156392567 +0000
-@@ -267,6 +267,14 @@
+@@ -278,6 +278,14 @@
              android:targetPackage="eu.chainfire.supersu"
              android:targetClass="eu.chainfire.supersu.MainActivity" />
      </header>
