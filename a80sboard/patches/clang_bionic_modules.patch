@@ -1,0 +1,219 @@
+diff -ruN bionic/libc/Android.mk bionic/libc/Android.mk
+--- bionic/libc/Android.mk	2014-03-01 08:36:10.556631708 +0000
++++ bionic/libc/Android.mk	2014-03-01 08:25:45.432068669 +0000
+@@ -693,6 +693,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := bionic/__stack_chk_fail.cpp
+ LOCAL_CFLAGS := $(libc_common_cflags) -fno-stack-protector -Werror
+ LOCAL_C_INCLUDES := $(libc_common_c_includes)
+@@ -709,10 +710,10 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(libc_tzcode_src_files)
+ LOCAL_CFLAGS := \
+     $(libc_common_cflags) \
+-    -std=gnu99 \
+     -DSTD_INSPIRED=1 \
+     -DTZDIR=\"/system/usr/share/zoneinfo\" \
+     -DTM_GMTOFF=tm_gmtoff \
+@@ -734,6 +735,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(libc_upstream_freebsd_src_files)
+ LOCAL_CFLAGS := \
+     $(libc_common_cflags) \
+@@ -757,6 +759,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(libc_upstream_netbsd_src_files)
+ LOCAL_CFLAGS := \
+     $(libc_common_cflags) \
+@@ -795,7 +798,6 @@
+ 
+ LOCAL_SRC_FILES := $(libc_common_src_files)
+ LOCAL_CFLAGS := $(libc_common_cflags) \
+-    -std=gnu99 \
+     -I$(LOCAL_PATH)/upstream-netbsd/libc/include # for netbsd private headers
+ LOCAL_C_INCLUDES := $(libc_common_c_includes)
+ LOCAL_MODULE := libc_common
+@@ -826,6 +828,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := \
+ 	$(libc_arch_static_src_files) \
+ 	$(libc_static_common_src_files) \
+@@ -833,8 +836,7 @@
+ 
+ LOCAL_C_INCLUDES := $(libc_common_c_includes)
+ LOCAL_CFLAGS := $(libc_common_cflags) \
+-                -DLIBC_STATIC \
+-                -std=gnu99
++                -DLIBC_STATIC
+ 
+ LOCAL_MODULE := libc_nomalloc
+ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+@@ -849,6 +851,7 @@
+ # ========================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := \
+ 	$(libc_arch_static_src_files) \
+ 	$(libc_static_common_src_files) \
+@@ -857,8 +860,7 @@
+ 	bionic/libc_init_static.cpp
+ 
+ LOCAL_CFLAGS := $(libc_common_cflags) \
+-                -DLIBC_STATIC \
+-                -std=gnu99
++                -DLIBC_STATIC
+ LOCAL_C_INCLUDES := $(libc_common_c_includes)
+ LOCAL_MODULE := libc
+ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+@@ -873,13 +875,14 @@
+ # ========================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ # pthread deadlock prediction:
+ # set -DPTHREAD_DEBUG -DPTHREAD_DEBUG_ENABLED=1 to enable support for
+ # pthread deadlock prediction.
+ # Since this code is experimental it is disabled by default.
+ # see libc/bionic/pthread_debug.c for details
+ 
+-LOCAL_CFLAGS := $(libc_common_cflags) -std=gnu99 -DPTHREAD_DEBUG -DPTHREAD_DEBUG_ENABLED=0
++LOCAL_CFLAGS := $(libc_common_cflags) -DPTHREAD_DEBUG -DPTHREAD_DEBUG_ENABLED=0
+ LOCAL_C_INCLUDES := $(libc_common_c_includes)
+ 
+ LOCAL_SRC_FILES := \
+@@ -964,6 +967,7 @@
+ # ========================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_CFLAGS := \
+ 	$(libc_common_cflags) \
+ 	-DMALLOC_QEMU_INSTRUMENT
+diff -ruN bionic/libc/bionic/pthread-timers.c bionic/libc/bionic/pthread-timers.c
+--- bionic/libc/bionic/pthread-timers.c	2014-03-01 08:36:12.920618491 +0000
++++ bionic/libc/bionic/pthread-timers.c	2014-03-01 08:25:47.156059359 +0000
+@@ -181,7 +181,8 @@
+   }
+ 
+   pthread_mutex_lock(&t->lock);
+-  for (int nn = 0; nn < MAX_THREAD_TIMERS; ++nn) {
++  int nn =0;
++  for (nn= 0; nn < MAX_THREAD_TIMERS; ++nn) {
+     thr_timer_t*  timer  = &t->timers[nn];
+     if (TIMER_ID_IS_VALID(timer->id)) {
+       // Tell the thread to start/stop.
+diff -ruN bionic/libdl/Android.mk bionic/libdl/Android.mk
+--- bionic/libdl/Android.mk	2014-03-01 08:36:15.896601851 +0000
++++ bionic/libdl/Android.mk	2014-03-01 08:29:00.075011389 +0000
+@@ -15,6 +15,7 @@
+ #
+ # DO NOT REMOVE --exclude-libs!
+ 
++LOCAL_CLANG := true
+ LOCAL_LDFLAGS := -Wl,--exclude-libs=libgcc.a
+ 
+ # for x86, exclude libgcc_eh.a for the same reasons as above
+@@ -46,6 +47,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES:= dltest.c
+ 
+ LOCAL_MODULE:= dltest
+diff -ruN bionic/libm/Android.mk bionic/libm/Android.mk
+--- bionic/libm/Android.mk	2014-03-01 08:36:15.908601781 +0000
++++ bionic/libm/Android.mk	2014-03-01 08:34:15.145275055 +0000
+@@ -259,6 +259,7 @@
+ # libm.a for target.
+ #
+ include $(CLEAR_VARS)
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libm
+ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+ LOCAL_ARM_MODE := arm
+@@ -272,6 +273,7 @@
+ # libm.so for target.
+ #
+ include $(CLEAR_VARS)
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libm
+ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+ LOCAL_SYSTEM_SHARED_LIBRARIES := libc
+diff -ruN bionic/libstdc++/Android.mk bionic/libstdc++/Android.mk
+--- bionic/libstdc++/Android.mk	2014-03-01 08:36:16.324599455 +0000
++++ bionic/libstdc++/Android.mk	2014-03-01 08:32:35.521827292 +0000
+@@ -12,6 +12,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES:= \
+ 	src/one_time_construction.cpp \
+ 	src/new.cpp \
+@@ -29,6 +30,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES:= \
+ 	src/one_time_construction.cpp \
+ 	src/new.cpp \
+diff -ruN bionic/libthread_db/Android.mk bionic/libthread_db/Android.mk
+--- bionic/libthread_db/Android.mk	2014-03-01 08:36:16.328599433 +0000
++++ bionic/libthread_db/Android.mk	2014-03-01 08:33:55.649383353 +0000
+@@ -6,6 +6,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES:= \
+ 	libthread_db.c
+ 
+@@ -20,6 +21,7 @@
+ 
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_WHOLE_STATIC_LIBRARIES := libthread_db
+ LOCAL_MODULE := libthread_db
+ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+diff -ruN bionic/linker/Android.mk bionic/linker/Android.mk
+--- bionic/linker/Android.mk	2014-03-01 08:36:16.348599323 +0000
++++ bionic/linker/Android.mk	2014-03-01 08:31:35.698157497 +0000
+@@ -1,6 +1,7 @@
+ LOCAL_PATH:= $(call my-dir)
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ ifeq ($(TARGET_ARCH),x86)
+     linker_begin_extension := c
+ else
+@@ -21,8 +22,9 @@
+ LOCAL_CFLAGS += -fno-stack-protector \
+         -Wstrict-overflow=5 \
+         -fvisibility=hidden \
+-        -Wall -Wextra -Werror
+-
++        -Wall -Wextra -Werror \
++        -Wno-error=gnu-designator \
++        -Wno-error=mismatched-tags
+ # We need to access Bionic private headers in the linker.
+ LOCAL_CFLAGS += -I$(LOCAL_PATH)/../libc/
+ 
