@@ -220,3 +220,15 @@ diff -ruN hardware/libhardware/include/hardware/hwcomposer.h hardware/libhardwar
  
  static inline int framebuffer_close(struct framebuffer_device_t* device) {
      return device->common.close(&device->common);
+diff -ruN hardware/libhardware/tests/hwc/cnativewindow.c hardware/libhardwaren/tests/hwc/cnativewindow.c
+--- hardware/libhardware/tests/hwc/cnativewindow.c	2014-03-01 07:47:04.135606469 +0000
++++ hardware/libhardwaren/tests/hwc/cnativewindow.c	2014-03-01 07:46:32.707754821 +0000
+@@ -477,7 +477,7 @@
+ 
+ 	if (hwc_init(win)) {
+ 		ERROR("cannot open hwcomposer, trying legacy fb HAL\n");
+-		err = framebuffer_open(module, &fb);
++		err = framebuffer_open(module, &fb,GRALLOC_HARDWARE_FB0);
+ 		if (err) {
+ 			ERROR("cannot open fb HAL (%s)", strerror(-err));
+ 			return -ENODEV;
