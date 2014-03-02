@@ -10,6 +10,7 @@ echo -e "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<manifest>\n" \
 		"\t<remote name=\"CyanogenMod\" fetch=\"git://github.com/CyanogenMod\" />\n" \
 		"\t<remote name=\"linaro\" fetch=\"git://android.git.linaro.org\" />\n" \
 		"\t<project path=\"vendor/archos\" name=\"android_vendor_archos\" remote=\"trevd\" revision=\"master\" />\n" \
+		"\t<project path=\"vendor/google\" name=\"android_vendor_google\" remote=\"trevd\" revision=\"kitkat\" />\n" \
 		"\t<project path=\"device/archos/a80sboard\" name=\"android_device_archos_a80sboard\" remote=\"trevd\" revision=\"master\" />\n" \
 		"\t<remove-project name=\"android_hardware_ti_omap4xxx\" />\n" \
 		"\t<remove-project name=\"platform/hardware/ti/wlan\"  />\n" \
@@ -34,9 +35,13 @@ cd system/security ;  git reset --hard ; cd $ANDROID_BUILD_TOP
 cd system/vold ;  git reset --hard ; cd $ANDROID_BUILD_TOP
 cd packages/inputmethods/hackerskeyboard  ;  git reset --hard ; cd $ANDROID_BUILD_TOP
 cd packages/apps/Settings ;  git reset --hard ; cd $ANDROID_BUILD_TOP
-
 cd frameworks/native ;  git reset --hard ; cd $ANDROID_BUILD_TOP
 cd hardware/libhardware ;  git reset --hard ; cd $ANDROID_BUILD_TOP
+cd hardware/libhardware_legacy ;  git reset --hard ; cd $ANDROID_BUILD_TOP
+cd bionic ;  git reset --hard ; cd $ANDROID_BUILD_TOP
+cd external/chromium_org ;  git reset --hard ; cd $ANDROID_BUILD_TOP
+cd external/llvm ;  git reset --hard ; cd $ANDROID_BUILD_TOP
+
 
 lunch omni_a80sboard-eng
 
@@ -47,8 +52,6 @@ if [ "$answer" == "y" ] ; then
 fi 
 
 # Apply Omni Patches 
-echo "Patching System Modules [ Enable Clang Building ]"
-patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/clang_system_modules.patch
 echo "Patching Hackers Keyboard [ Removing Launcher Icon ]"
 patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/hackerskeyboard.patch
 echo "Patching Native Framework [ Surfaceflinger ]"
@@ -57,6 +60,16 @@ echo "Patching Libhardware [ Omap Enhanced Framebuffer ]"
 patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/libhardware.patch
 echo "Patching Settings Package [ Enable Koush's Embedded Superuser  ]"
 patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/embedded_superuser_omni.patch
+echo "Patching System Modules [ Enable Clang Building ]"
+patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/clang_system_modules.patch
+echo "Patching Hardware Modules [ Enable Clang Building ]"
+patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/clang_hardware_modules.patch
+echo "Patching Bionic Modules [ Enable Clang Building ]"
+patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/clang_bionic_modules.patch
+echo "Patching LLVM Modules [ Enable Clang Building ]"
+patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/clang_llvm.patch
+echo "Patching Chromium_org Modules [ Enable Clang Building ]"
+patch  --silent --forward --reject-file=- --strip=0 < vendor/archos/a80sboard/patches/clang_chromium_org.patch
 
 if [ -d system/extras/su ] ; then 
 	echo "Removing Standard su binary"
