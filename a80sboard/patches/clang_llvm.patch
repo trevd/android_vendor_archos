@@ -1,0 +1,463 @@
+diff -ruN external/llvm/lib/Analysis/Android.mk external/llvm/lib/Analysis/Android.mk
+--- external/llvm/lib/Analysis/Android.mk	2014-03-02 12:37:11.298877725 +0000
++++ external/llvm/lib/Analysis/Android.mk	2014-03-02 11:12:27.886972429 +0000
+@@ -78,6 +78,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMAnalysis
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_SRC_FILES := $(analysis_SRC_FILES)
+diff -ruN external/llvm/lib/Analysis/IPA/Android.mk external/llvm/lib/Analysis/IPA/Android.mk
+--- external/llvm/lib/Analysis/IPA/Android.mk	2014-03-02 12:37:11.318877584 +0000
++++ external/llvm/lib/Analysis/IPA/Android.mk	2014-03-02 11:12:33.910929763 +0000
+@@ -27,6 +27,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(analysis_ipa_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMipa
+diff -ruN external/llvm/lib/AsmParser/Android.mk external/llvm/lib/AsmParser/Android.mk
+--- external/llvm/lib/AsmParser/Android.mk	2014-03-02 12:37:11.378877160 +0000
++++ external/llvm/lib/AsmParser/Android.mk	2014-03-02 11:10:10.599946217 +0000
+@@ -22,6 +22,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(asm_parser_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMAsmParser
+diff -ruN external/llvm/lib/Bitcode/Reader/Android.mk external/llvm/lib/Bitcode/Reader/Android.mk
+--- external/llvm/lib/Bitcode/Reader/Android.mk	2014-03-02 12:37:11.390877076 +0000
++++ external/llvm/lib/Bitcode/Reader/Android.mk	2014-03-02 11:10:52.199650856 +0000
+@@ -23,6 +23,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(bitcode_reader_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMBitReader
+diff -ruN external/llvm/lib/Bitcode/Writer/Android.mk external/llvm/lib/Bitcode/Writer/Android.mk
+--- external/llvm/lib/Bitcode/Writer/Android.mk	2014-03-02 12:37:11.394877048 +0000
++++ external/llvm/lib/Bitcode/Writer/Android.mk	2014-03-02 11:10:46.751689522 +0000
+@@ -24,6 +24,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(bitcode_writer_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMBitWriter
+diff -ruN external/llvm/lib/CodeGen/Android.mk external/llvm/lib/CodeGen/Android.mk
+--- external/llvm/lib/CodeGen/Android.mk	2014-03-02 12:37:11.398877019 +0000
++++ external/llvm/lib/CodeGen/Android.mk	2014-03-02 11:11:30.855376625 +0000
+@@ -129,6 +129,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(codegen_SRC_FILES)
+ LOCAL_MODULE:= libLLVMCodeGen
+ 
+diff -ruN external/llvm/lib/CodeGen/AsmPrinter/Android.mk external/llvm/lib/CodeGen/AsmPrinter/Android.mk
+--- external/llvm/lib/CodeGen/AsmPrinter/Android.mk	2014-03-02 12:37:11.398877019 +0000
++++ external/llvm/lib/CodeGen/AsmPrinter/Android.mk	2014-03-02 11:11:19.055460313 +0000
+@@ -34,6 +34,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES :=	\
+ 	AsmPrinter.cpp \
+ 	AsmPrinterDwarf.cpp \
+diff -ruN external/llvm/lib/CodeGen/SelectionDAG/Android.mk external/llvm/lib/CodeGen/SelectionDAG/Android.mk
+--- external/llvm/lib/CodeGen/SelectionDAG/Android.mk	2014-03-02 12:37:11.626875411 +0000
++++ external/llvm/lib/CodeGen/SelectionDAG/Android.mk	2014-03-02 11:11:10.279522567 +0000
+@@ -43,6 +43,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(codegen_selectiondag_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMSelectionDAG
+diff -ruN external/llvm/lib/IR/Android.mk external/llvm/lib/IR/Android.mk
+--- external/llvm/lib/IR/Android.mk	2014-03-02 12:37:11.842873887 +0000
++++ external/llvm/lib/IR/Android.mk	2014-03-02 11:09:56.256048118 +0000
+@@ -61,6 +61,7 @@
+ 
+ REQUIRES_RTTI := 1
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(vmcore_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMCore
+diff -ruN external/llvm/lib/IRReader/Android.mk external/llvm/lib/IRReader/Android.mk
+--- external/llvm/lib/IRReader/Android.mk	2014-03-02 12:37:11.950873125 +0000
++++ external/llvm/lib/IRReader/Android.mk	2014-03-02 11:10:57.015616679 +0000
+@@ -25,6 +25,7 @@
+ 
+ REQUIRES_RTTI := 1
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(irreader_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMIRReader
+diff -ruN external/llvm/lib/Linker/Android.mk external/llvm/lib/Linker/Android.mk
+--- external/llvm/lib/Linker/Android.mk	2014-03-02 12:37:11.954873096 +0000
++++ external/llvm/lib/Linker/Android.mk	2014-03-02 11:10:28.783817078 +0000
+@@ -20,6 +20,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(linker_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMLinker
+diff -ruN external/llvm/lib/MC/MCParser/Android.mk external/llvm/lib/MC/MCParser/Android.mk
+--- external/llvm/lib/MC/MCParser/Android.mk	2014-03-02 12:37:11.986872871 +0000
++++ external/llvm/lib/MC/MCParser/Android.mk	2014-03-02 11:10:16.519904168 +0000
+@@ -28,6 +28,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(mc_parser_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMMCParser
+diff -ruN external/llvm/lib/Object/Android.mk external/llvm/lib/Object/Android.mk
+--- external/llvm/lib/Object/Android.mk	2014-03-02 12:37:11.998872786 +0000
++++ external/llvm/lib/Object/Android.mk	2014-03-02 11:10:04.183991793 +0000
+@@ -33,6 +33,7 @@
+ LOCAL_MODULE:= libLLVMObject
+ LOCAL_MODULE_TAGS := optional
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(object_SRC_FILES)
+ 
+ include $(LLVM_DEVICE_BUILD_MK)
+diff -ruN external/llvm/lib/Option/Android.mk external/llvm/lib/Option/Android.mk
+--- external/llvm/lib/Option/Android.mk	2014-03-02 12:37:12.014872673 +0000
++++ external/llvm/lib/Option/Android.mk	2014-03-02 11:11:04.279565135 +0000
+@@ -28,6 +28,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(option_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMOption
+diff -ruN external/llvm/lib/Support/Android.mk external/llvm/lib/Support/Android.mk
+--- external/llvm/lib/Support/Android.mk	2014-03-02 12:37:12.022872617 +0000
++++ external/llvm/lib/Support/Android.mk	2014-03-02 11:06:42.573427122 +0000
+@@ -102,6 +102,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(support_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMSupport
+diff -ruN external/llvm/lib/Target/Android.mk external/llvm/lib/Target/Android.mk
+--- external/llvm/lib/Target/Android.mk	2014-03-02 12:37:12.330870444 +0000
++++ external/llvm/lib/Target/Android.mk	2014-03-02 11:09:50.168091378 +0000
+@@ -28,6 +28,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(target_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMTarget
+diff -ruN external/llvm/lib/Target/ARM/Android.mk external/llvm/lib/Target/ARM/Android.mk
+--- external/llvm/lib/Target/ARM/Android.mk	2014-03-02 12:37:12.270870868 +0000
++++ external/llvm/lib/Target/ARM/Android.mk	2014-03-02 11:09:41.060156107 +0000
+@@ -71,6 +71,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMARMCodeGen
+ LOCAL_MODULE_TAGS := optional
+ 
+diff -ruN external/llvm/lib/Target/ARM/AsmParser/Android.mk external/llvm/lib/Target/ARM/AsmParser/Android.mk
+--- external/llvm/lib/Target/ARM/AsmParser/Android.mk	2014-03-02 12:37:12.274870840 +0000
++++ external/llvm/lib/Target/ARM/AsmParser/Android.mk	2014-03-02 11:09:27.232254403 +0000
+@@ -49,6 +49,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMARMAsmParser
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_SRC_FILES := $(arm_asm_parser_SRC_FILES)
+diff -ruN external/llvm/lib/Target/ARM/Disassembler/Android.mk external/llvm/lib/Target/ARM/Disassembler/Android.mk
+--- external/llvm/lib/Target/ARM/Disassembler/Android.mk	2014-03-02 12:37:12.286870755 +0000
++++ external/llvm/lib/Target/ARM/Disassembler/Android.mk	2014-03-02 11:09:09.052383680 +0000
+@@ -19,6 +19,7 @@
+ 
+ TBLGEN_TD_DIR := $(LOCAL_PATH)/..
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(arm_disassembler_SRC_FILES)
+ 
+ LOCAL_C_INCLUDES += $(LOCAL_PATH)/..
+diff -ruN external/llvm/lib/Target/ARM/InstPrinter/Android.mk external/llvm/lib/Target/ARM/InstPrinter/Android.mk
+--- external/llvm/lib/Target/ARM/InstPrinter/Android.mk	2014-03-02 12:37:12.286870755 +0000
++++ external/llvm/lib/Target/ARM/InstPrinter/Android.mk	2014-03-02 11:09:19.348310460 +0000
+@@ -40,6 +40,7 @@
+ 
+ TBLGEN_TD_DIR := $(LOCAL_PATH)/..
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(arm_asm_printer_SRC_FILES)
+ 
+ LOCAL_C_INCLUDES+= \
+diff -ruN external/llvm/lib/Target/ARM/MCTargetDesc/Android.mk external/llvm/lib/Target/ARM/MCTargetDesc/Android.mk
+--- external/llvm/lib/Target/ARM/MCTargetDesc/Android.mk	2014-03-02 12:37:12.294870698 +0000
++++ external/llvm/lib/Target/ARM/MCTargetDesc/Android.mk	2014-03-02 11:09:45.328125772 +0000
+@@ -44,6 +44,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMARMDesc
+ LOCAL_MODULE_TAGS := optional
+ 
+diff -ruN external/llvm/lib/Target/ARM/TargetInfo/Android.mk external/llvm/lib/Target/ARM/TargetInfo/Android.mk
+--- external/llvm/lib/Target/ARM/TargetInfo/Android.mk	2014-03-02 12:37:12.294870698 +0000
++++ external/llvm/lib/Target/ARM/TargetInfo/Android.mk	2014-03-02 11:09:34.484202848 +0000
+@@ -40,6 +40,7 @@
+ 
+ TBLGEN_TD_DIR := $(LOCAL_PATH)/..
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(arm_target_info_SRC_FILES)
+ 
+ LOCAL_C_INCLUDES +=	\
+diff -ruN external/llvm/lib/Target/Mips/Android.mk external/llvm/lib/Target/Mips/Android.mk
+--- external/llvm/lib/Target/Mips/Android.mk	2014-03-02 12:37:12.490869316 +0000
++++ external/llvm/lib/Target/Mips/Android.mk	2014-03-02 11:07:50.600942119 +0000
+@@ -69,6 +69,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMMipsCodeGen
+ LOCAL_MODULE_TAGS := optional
+ 
+diff -ruN external/llvm/lib/Target/Mips/AsmParser/Android.mk external/llvm/lib/Target/Mips/AsmParser/Android.mk
+--- external/llvm/lib/Target/Mips/AsmParser/Android.mk	2014-03-02 12:37:12.518869118 +0000
++++ external/llvm/lib/Target/Mips/AsmParser/Android.mk	2014-03-02 11:07:32.721069523 +0000
+@@ -42,6 +42,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMMipsAsmParser
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_SRC_FILES := $(mips_asm_parser_SRC_FILES)
+diff -ruN external/llvm/lib/Target/Mips/Disassembler/Android.mk external/llvm/lib/Target/Mips/Disassembler/Android.mk
+--- external/llvm/lib/Target/Mips/Disassembler/Android.mk	2014-03-02 12:37:12.526869061 +0000
++++ external/llvm/lib/Target/Mips/Disassembler/Android.mk	2014-03-02 11:07:07.753247518 +0000
+@@ -15,6 +15,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMMipsDisassembler
+ LOCAL_MODULE_TAGS := optional
+ 
+diff -ruN external/llvm/lib/Target/Mips/InstPrinter/Android.mk external/llvm/lib/Target/Mips/InstPrinter/Android.mk
+--- external/llvm/lib/Target/Mips/InstPrinter/Android.mk	2014-03-02 12:37:12.526869061 +0000
++++ external/llvm/lib/Target/Mips/InstPrinter/Android.mk	2014-03-02 11:07:19.561163327 +0000
+@@ -32,6 +32,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMMipsAsmPrinter
+ LOCAL_MODULE_TAGS := optional
+ 
+diff -ruN external/llvm/lib/Target/Mips/MCTargetDesc/Android.mk external/llvm/lib/Target/Mips/MCTargetDesc/Android.mk
+--- external/llvm/lib/Target/Mips/MCTargetDesc/Android.mk	2014-03-02 12:37:12.530869033 +0000
++++ external/llvm/lib/Target/Mips/MCTargetDesc/Android.mk	2014-03-02 11:07:57.496892994 +0000
+@@ -40,6 +40,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMMipsDesc
+ LOCAL_MODULE_TAGS := optional
+ 
+diff -ruN external/llvm/lib/Target/Mips/TargetInfo/Android.mk external/llvm/lib/Target/Mips/TargetInfo/Android.mk
+--- external/llvm/lib/Target/Mips/TargetInfo/Android.mk	2014-03-02 12:37:12.546868920 +0000
++++ external/llvm/lib/Target/Mips/TargetInfo/Android.mk	2014-03-02 11:07:44.880982870 +0000
+@@ -32,6 +32,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMMipsInfo
+ LOCAL_MODULE_TAGS := optional
+ 
+diff -ruN external/llvm/lib/Target/X86/Android.mk external/llvm/lib/Target/X86/Android.mk
+--- external/llvm/lib/Target/X86/Android.mk	2014-03-02 12:37:12.842866832 +0000
++++ external/llvm/lib/Target/X86/Android.mk	2014-03-02 11:08:47.232538905 +0000
+@@ -59,6 +59,7 @@
+ 
+ TBLGEN_TABLES := $(x86_codegen_TBLGEN_TABLES)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(x86_codegen_SRC_FILES)
+ 
+ LOCAL_MODULE:= libLLVMX86CodeGen
+diff -ruN external/llvm/lib/Target/X86/AsmParser/Android.mk external/llvm/lib/Target/X86/AsmParser/Android.mk
+--- external/llvm/lib/Target/X86/AsmParser/Android.mk	2014-03-02 12:37:12.842866832 +0000
++++ external/llvm/lib/Target/X86/AsmParser/Android.mk	2014-03-02 11:08:28.760670369 +0000
+@@ -44,6 +44,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMX86AsmParser
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_SRC_FILES := $(x86_asm_parser_SRC_FILES)
+diff -ruN external/llvm/lib/Target/X86/Disassembler/Android.mk external/llvm/lib/Target/X86/Disassembler/Android.mk
+--- external/llvm/lib/Target/X86/Disassembler/Android.mk	2014-03-02 12:37:12.846866804 +0000
++++ external/llvm/lib/Target/X86/Disassembler/Android.mk	2014-03-02 11:08:05.416836583 +0000
+@@ -15,6 +15,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ TBLGEN_TABLES := $(x86_disassembler_TBLGEN_TABLES)
+ 
+ TBLGEN_TD_DIR := $(LOCAL_PATH)/..
+diff -ruN external/llvm/lib/Target/X86/InstPrinter/Android.mk external/llvm/lib/Target/X86/InstPrinter/Android.mk
+--- external/llvm/lib/Target/X86/InstPrinter/Android.mk	2014-03-02 12:37:12.850866775 +0000
++++ external/llvm/lib/Target/X86/InstPrinter/Android.mk	2014-03-02 11:08:17.304751928 +0000
+@@ -18,6 +18,7 @@
+ include $(CLEAR_VARS)
+ include $(CLEAR_TBLGEN_VARS)
+ 
++LOCAL_CLANG := true
+ TBLGEN_TABLES := $(x86_instprinter_TBLGEN_TABLES)
+ 
+ TBLGEN_TD_DIR := $(LOCAL_PATH)/..
+diff -ruN external/llvm/lib/Target/X86/MCTargetDesc/Android.mk external/llvm/lib/Target/X86/MCTargetDesc/Android.mk
+--- external/llvm/lib/Target/X86/MCTargetDesc/Android.mk	2014-03-02 12:37:12.850866775 +0000
++++ external/llvm/lib/Target/X86/MCTargetDesc/Android.mk	2014-03-02 11:09:01.980433982 +0000
+@@ -41,6 +41,7 @@
+ include $(CLEAR_TBLGEN_VARS)
+ 
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMX86Desc
+ LOCAL_MODULE_TAGS := optional
+ 
+diff -ruN external/llvm/lib/Target/X86/TargetInfo/Android.mk external/llvm/lib/Target/X86/TargetInfo/Android.mk
+--- external/llvm/lib/Target/X86/TargetInfo/Android.mk	2014-03-02 12:37:12.874866607 +0000
++++ external/llvm/lib/Target/X86/TargetInfo/Android.mk	2014-03-02 11:08:41.640578699 +0000
+@@ -39,7 +39,7 @@
+ TBLGEN_TABLES := $(x86_target_info_TBLGEN_TABLES)
+ 
+ TBLGEN_TD_DIR := $(LOCAL_PATH)/..
+-
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(x86_target_info_SRC_FILES)
+ 
+ LOCAL_C_INCLUDES +=     \
+diff -ruN external/llvm/lib/Target/X86/Utils/Android.mk external/llvm/lib/Target/X86/Utils/Android.mk
+--- external/llvm/lib/Target/X86/Utils/Android.mk	2014-03-02 12:37:12.874866607 +0000
++++ external/llvm/lib/Target/X86/Utils/Android.mk	2014-03-02 11:08:56.532472738 +0000
+@@ -7,6 +7,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(x86_utils_SRC_FILES)
+ 
+ LOCAL_C_INCLUDES += $(LOCAL_PATH)/..
+diff -ruN external/llvm/lib/Transforms/InstCombine/Android.mk external/llvm/lib/Transforms/InstCombine/Android.mk
+--- external/llvm/lib/Transforms/InstCombine/Android.mk	2014-03-02 12:37:13.018865590 +0000
++++ external/llvm/lib/Transforms/InstCombine/Android.mk	2014-03-02 11:11:44.135282465 +0000
+@@ -32,6 +32,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(transforms_inst_combine_SRC_FILES)
+ LOCAL_MODULE:= libLLVMInstCombine
+ 
+diff -ruN external/llvm/lib/Transforms/Instrumentation/Android.mk external/llvm/lib/Transforms/Instrumentation/Android.mk
+--- external/llvm/lib/Transforms/Instrumentation/Android.mk	2014-03-02 12:37:13.058865309 +0000
++++ external/llvm/lib/Transforms/Instrumentation/Android.mk	2014-03-02 11:11:49.415245035 +0000
+@@ -28,6 +28,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_MODULE:= libLLVMInstrumentation
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_SRC_FILES := $(instrumentation_SRC_FILES)
+diff -ruN external/llvm/lib/Transforms/IPO/Android.mk external/llvm/lib/Transforms/IPO/Android.mk
+--- external/llvm/lib/Transforms/IPO/Android.mk	2014-03-02 12:37:12.978865873 +0000
++++ external/llvm/lib/Transforms/IPO/Android.mk	2014-03-02 11:12:10.311096943 +0000
+@@ -40,6 +40,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(transforms_ipo_SRC_FILES)
+ LOCAL_MODULE:= libLLVMipo
+ 
+diff -ruN external/llvm/lib/Transforms/ObjCARC/Android.mk external/llvm/lib/Transforms/ObjCARC/Android.mk
+--- external/llvm/lib/Transforms/ObjCARC/Android.mk	2014-03-02 12:37:13.118864885 +0000
++++ external/llvm/lib/Transforms/ObjCARC/Android.mk	2014-03-02 11:11:36.927333569 +0000
+@@ -28,6 +28,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(transforms_objcarc_SRC_FILES)
+ LOCAL_MODULE:= libLLVMTransformObjCARC
+ 
+diff -ruN external/llvm/lib/Transforms/Scalar/Android.mk external/llvm/lib/Transforms/Scalar/Android.mk
+--- external/llvm/lib/Transforms/Scalar/Android.mk	2014-03-02 12:37:13.122864857 +0000
++++ external/llvm/lib/Transforms/Scalar/Android.mk	2014-03-02 11:11:57.391188501 +0000
+@@ -53,6 +53,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(transforms_scalar_SRC_FILES)
+ LOCAL_MODULE:= libLLVMScalarOpts
+ 
+diff -ruN external/llvm/lib/Transforms/Utils/Android.mk external/llvm/lib/Transforms/Utils/Android.mk
+--- external/llvm/lib/Transforms/Utils/Android.mk	2014-03-02 12:37:13.154864631 +0000
++++ external/llvm/lib/Transforms/Utils/Android.mk	2014-03-02 11:12:22.863008016 +0000
+@@ -51,6 +51,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(transforms_utils_SRC_FILES)
+ LOCAL_MODULE:= libLLVMTransformUtils
+ 
+diff -ruN external/llvm/lib/Transforms/Vectorize/Android.mk external/llvm/lib/Transforms/Vectorize/Android.mk
+--- external/llvm/lib/Transforms/Vectorize/Android.mk	2014-03-02 12:37:13.166864547 +0000
++++ external/llvm/lib/Transforms/Vectorize/Android.mk	2014-03-02 11:12:02.551151932 +0000
+@@ -23,6 +23,7 @@
+ # =====================================================
+ include $(CLEAR_VARS)
+ 
++LOCAL_CLANG := true
+ LOCAL_SRC_FILES := $(transforms_vectorize_SRC_FILES)
+ LOCAL_MODULE:= libLLVMVectorize
+ 
