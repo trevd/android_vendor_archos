@@ -1,4 +1,4 @@
-g   
+   
 if [ ! -d .repo/local_manifests ] ; then 
     mkdir .repo/local_manifests
 fi
