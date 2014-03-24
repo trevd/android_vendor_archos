@@ -201,7 +201,7 @@ diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/
 +import com.android.settings.Utils;
 +import com.koushikdutta.superuser.LogNativeFragment;
 +import com.koushikdutta.superuser.PolicyFragmentInternal;
-+import com.koushikdutta.superuser.SettingsativeFragment;
++import com.koushikdutta.superuser.SettingsNativeFragment;
 +
 +public class PolicyNativeFragment extends com.koushikdutta.superuser.PolicyNativeFragment {
 +    @Override
@@ -228,8 +228,8 @@ diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/
 +            }
 +
 +            @Override
-+            protected SettingsativeFragment createSettingsativeFragment() {
-+                return new SettingsativeFragment() {
++            protected SettingsNativeFragment createSettingsNativeFragment() {
++                return new SettingsNativeFragment() {
 +                    @Override
 +                    public View onCreateView(LayoutInflater inflater,
 +                            ViewGroup container, Bundle savedInstanceState) {
