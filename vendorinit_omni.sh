@@ -1,6 +1,10 @@
+
+INITDIR=$PWD
+echo "Curret Directory $INITDIR"
+
    
-if [ ! -d .repo/local_manifests ] ; then 
-    mkdir .repo/local_manifests
+if [ ! -d $INITDIR/.repo/local_manifests ] ; then 
+    mkdir $INITDIR/.repo/local_manifests
 fi
 
 echo "Creating Local Manifests for Archos device"
@@ -18,6 +22,12 @@ echo -e "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<manifest>\n" \
                                                                          
 repo sync vendor/archos
 repo sync device/archos/a80sboard
+
+if [ ! -d $INITDIR/build ] ; then 
+    echo "Syncing Android Build System"
+    repo sync build
+fi
+
 echo "Running source build/envsetup.sh"
 source build/envsetup.sh
 
@@ -26,7 +36,7 @@ if [ -f .repo/local_manifests/roomservice.xml ] ; then
 fi
 if [ -z "$ANDROID_BUILD_TOP" ] ; then
     echo "Setting ANDROID_BUILD_TOP"
-    ANDROID_BUILD_TOP=$(gettop)
+    export ANDROID_BUILD_TOP=$(gettop)
 fi
 
 # Reset Modules to be patched
