@@ -1,14 +1,14 @@
 diff -ruN packages/apps/Settings/AndroidManifest.xml packages/apps/Settings/AndroidManifest.xml
---- packages/apps/Settings/AndroidManifest.xml	2014-02-18 06:49:42.089504323 +0000
-+++ packages/apps/Settings/AndroidManifest.xml	2014-02-18 06:34:40.952409738 +0000
+--- packages/apps/Settings/AndroidManifest.xml    2014-03-24 03:39:14.957201132 +0000
++++ packages/apps/Settings/AndroidManifest.xml   2014-03-24 03:36:36.882182732 +0000
 @@ -69,6 +69,34 @@
      <uses-permission android:name="android.permission.MANAGE_DEVICE_ADMINS" />
      <uses-permission android:name="android.permission.READ_SMS" />
      <uses-permission android:name="android.permission.SEND_SMS" />
-+	<uses-permission android:name="android.permission.ACCESS_SUPERUSER" />
-+	<uses-permission android:name="android.permission.REPORT_SUPERUSER" />
-+	<uses-permission android:name="android.permission.REQUEST_SUPERUSER" />
-+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
++    <uses-permission android:name="android.permission.ACCESS_SUPERUSER" />
++    <uses-permission android:name="android.permission.REPORT_SUPERUSER" />
++    <uses-permission android:name="android.permission.REQUEST_SUPERUSER" />
++    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 +
 +
 +    <permission
@@ -36,12 +36,13 @@ diff -ruN packages/apps/Settings/AndroidManifest.xml packages/apps/Settings/Andr
  
      <application android:label="@string/settings_label"
              android:icon="@mipmap/ic_launcher_settings"
-@@ -79,7 +107,62 @@
+@@ -78,6 +106,64 @@
+             android:requiredForAllUsers="true"
              android:supportsRtl="true">
  
-         <!-- Settings -->
-+      <!-- Only system/su can open this activity -->
-+      <!-- This activity will then call the MultitaskSuRequestActivity to create a new task stack -->
++        
++        <!-- Only system/su can open this activity -->
++        <!-- This activity will then call the MultitaskSuRequestActivity to create a new task stack -->
 +      <activity
 +          android:name=".cyanogenmod.superuser.RequestActivity"
 +          android:configChanges="keyboardHidden|orientation|screenSize"
@@ -80,7 +81,7 @@ diff -ruN packages/apps/Settings/AndroidManifest.xml packages/apps/Settings/Andr
 +      <receiver
 +          android:name=".cyanogenmod.superuser.SuReceiver"
 +          android:permission="android.permission.REPORT_SUPERUSER" />
- 
++ 
 +      <receiver
 +          android:name=".cyanogenmod.superuser.PackageChangeReceiver" >
 +          <intent-filter>
@@ -96,46 +97,43 @@ diff -ruN packages/apps/Settings/AndroidManifest.xml packages/apps/Settings/Andr
 +              <data android:scheme="package" />
 +          </intent-filter>
 +      </receiver>
++        
+         <!-- Settings -->
          <activity android:name="Settings"
                  android:label="@string/settings_label_launcher"
-                 android:taskAffinity="com.android.settings"
 diff -ruN packages/apps/Settings/Android.mk packages/apps/Settings/Android.mk
---- packages/apps/Settings/Android.mk	2014-02-18 06:49:42.057504569 +0000
-+++ packages/apps/Settings/Android.mk	2014-02-18 06:34:40.956409707 +0000
-@@ -8,23 +8,29 @@
- 
+--- packages/apps/Settings/Android.mk   2014-03-24 05:22:10.687922327 +0000
++++ packages/apps/Settings/Android.mk   2014-03-24 05:22:02.567969526 +0000
+@@ -9,20 +9,25 @@
  LOCAL_SRC_FILES := $(call all-java-files-under, src) \
          src/com/android/settings/EventLogTags.logtags
-+LOCAL_SRC_FILES += $(call all-java-files-under,../../../external/koush/Superuser/Superuser/src) 
-+LOCAL_SRC_FILES += $(call all-java-files-under,../../../external/koush/Widgets/Widgets/src)
  LOCAL_SRC_FILES += $(call all-java-files-under, ../OmniGears/src)
++LOCAL_SRC_FILES += $(call all-java-files-under,../../../external/koush/Widgets/Widgets/src)
++LOCAL_SRC_FILES += $(call all-java-files-under,../../../external/koush/Superuser/Superuser/src)
  LOCAL_SRC_FILES += $(call all-java-files-under, ../PerformanceControl/src)
  
  LOCAL_RESOURCE_DIR += $(LOCAL_PATH)/res
  LOCAL_RESOURCE_DIR += packages/apps/OmniGears/res
-+LOCAL_RESOURCE_DIR += $(LOCAL_PATH)/../../../external/koush/Widgets/Widgets/res 
++LOCAL_RESOURCE_DIR += $(LOCAL_PATH)/../../../external/koush/Widgets/Widgets/res
 +LOCAL_RESOURCE_DIR += $(LOCAL_PATH)/../../../external/koush/Superuser/Superuser/res
  LOCAL_RESOURCE_DIR += packages/apps/PerformanceControl/res
  
  LOCAL_ASSET_DIR += packages/apps/PerformanceControl/assets
  
  LOCAL_AAPT_FLAGS := --auto-add-overlay \
- 	--extra-packages org.omnirom.omnigears \
-+	--extra-packages com.koushikdutta.widgets \
-+	--extra-packages com.koushikdutta.superuser \
- 	--extra-packages com.brewcrewfoo.performance
+-   --extra-packages org.omnirom.omnigears \
++   --extra-packages org.omnirom.omnigears:com.koushikdutta.superuser:com.koushikdutta.widgets \
+    --extra-packages com.brewcrewfoo.performance
  
  LOCAL_PACKAGE_NAME := Settings
  LOCAL_CERTIFICATE := platform
- LOCAL_PRIVILEGED_MODULE := true
--
 +LOCAL_AAPT_INCLUDE_ALL_RESOURCES := true
- LOCAL_PROGUARD_FLAG_FILES := proguard.flags
+ LOCAL_PRIVILEGED_MODULE := true
  
- LOCAL_AAPT_FLAGS += -c zz_ZZ
+ LOCAL_PROGUARD_FLAG_FILES := proguard.flags
 diff -ruN packages/apps/Settings/proguard.flags packages/apps/Settings/proguard.flags
---- packages/apps/Settings/proguard.flags	2014-02-18 06:49:42.097504261 +0000
-+++ packages/apps/Settings/proguard.flags	2014-02-18 06:34:40.960409676 +0000
+--- packages/apps/Settings/proguard.flags    2014-03-24 03:39:14.957201132 +0000
++++ packages/apps/Settings/proguard.flags   2014-03-24 03:34:17.167050469 +0000
 @@ -15,6 +15,8 @@
  -keep class com.android.settings.NotificationStation
  -keep class com.android.settings.nfc.*
@@ -146,8 +144,8 @@ diff -ruN packages/apps/Settings/proguard.flags packages/apps/Settings/proguard.
  # Keep click responders
  -keepclassmembers class com.android.settings.inputmethod.UserDictionaryAddWordActivity {
 diff -ruN packages/apps/Settings/res/xml/settings_headers.xml packages/apps/Settings/res/xml/settings_headers.xml
---- packages/apps/Settings/res/xml/settings_headers.xml	2014-02-18 06:49:43.253495407 +0000
-+++ packages/apps/Settings/res/xml/settings_headers.xml	2014-02-18 06:34:43.156392567 +0000
+--- packages/apps/Settings/res/xml/settings_headers.xml     2014-03-24 03:39:15.225199467 +0000
++++ packages/apps/Settings/res/xml/settings_headers.xml    2014-03-24 03:34:17.167050469 +0000
 @@ -278,6 +278,14 @@
              android:targetPackage="eu.chainfire.supersu"
              android:targetClass="eu.chainfire.supersu.MainActivity" />
@@ -164,35 +162,32 @@ diff -ruN packages/apps/Settings/res/xml/settings_headers.xml packages/apps/Sett
      <!-- Performance Controls -->
      <header
 diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java
---- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java	1970-01-01 01:00:00.000000000 +0100
-+++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java	2014-02-18 06:34:40.516413136 +0000
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java     1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/MultitaskSuRequestActivity.java    2014-03-24 03:34:17.167050469 +0000
 @@ -0,0 +1,4 @@
 +package com.android.settings.cyanogenmod.superuser;
 +
 +public class MultitaskSuRequestActivity extends com.koushikdutta.superuser.MultitaskSuRequestActivity {
 +}
-+
 diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java
---- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java	1970-01-01 01:00:00.000000000 +0100
-+++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java	2014-02-18 06:34:40.512413167 +0000
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java  1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/NotifyActivity.java 2014-03-24 03:34:17.167050469 +0000
 @@ -0,0 +1,4 @@
 +package com.android.settings.cyanogenmod.superuser;
 +
 +public class NotifyActivity extends com.koushikdutta.superuser.NotifyActivity {
 +}
-+
 diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java
---- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java	1970-01-01 01:00:00.000000000 +0100
-+++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java	2014-02-18 06:34:40.516413136 +0000
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java     1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PackageChangeReceiver.java    2014-03-24 03:34:17.167050469 +0000
 @@ -0,0 +1,4 @@
 +package com.android.settings.cyanogenmod.superuser;
 +
 +public class PackageChangeReceiver extends com.koushikdutta.superuser.PackageChangeReceiver {
 +}
-+
 diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java
---- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java	1970-01-01 01:00:00.000000000 +0100
-+++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java	2014-02-18 06:34:40.512413167 +0000
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java 1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/PolicyNativeFragment.java     2014-03-24 03:34:17.167050469 +0000
 @@ -0,0 +1,64 @@
 +package com.android.settings.cyanogenmod.superuser;
 +
@@ -206,7 +201,7 @@ diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/
 +import com.android.settings.Utils;
 +import com.koushikdutta.superuser.LogNativeFragment;
 +import com.koushikdutta.superuser.PolicyFragmentInternal;
-+import com.koushikdutta.superuser.SettingsNativeFragment;
++import com.koushikdutta.superuser.SettingsativeFragment;
 +
 +public class PolicyNativeFragment extends com.koushikdutta.superuser.PolicyNativeFragment {
 +    @Override
@@ -233,8 +228,8 @@ diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/
 +            }
 +
 +            @Override
-+            protected SettingsNativeFragment createSettingsNativeFragment() {
-+                return new SettingsNativeFragment() {
++            protected SettingsativeFragment createSettingsativeFragment() {
++                return new SettingsativeFragment() {
 +                    @Override
 +                    public View onCreateView(LayoutInflater inflater,
 +                            ViewGroup container, Bundle savedInstanceState) {
@@ -259,20 +254,18 @@ diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/
 +    }
 +}
 diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java
---- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java	1970-01-01 01:00:00.000000000 +0100
-+++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java	2014-02-18 06:34:40.508413198 +0000
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java 1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/RequestActivity.java     2014-03-24 03:34:17.167050469 +0000
 @@ -0,0 +1,4 @@
 +package com.android.settings.cyanogenmod.superuser;
 +
 +public class RequestActivity extends com.koushikdutta.superuser.RequestActivity {
 +}
-+
 diff -ruN packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java
---- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java	1970-01-01 01:00:00.000000000 +0100
-+++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java	2014-02-18 06:34:40.520413105 +0000
+--- packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java 1970-01-01 01:00:00.000000000 +0100
++++ packages/apps/Settings/src/com/android/settings/cyanogenmod/superuser/SuReceiver.java     2014-03-24 03:34:17.167050469 +0000
 @@ -0,0 +1,4 @@
 +package com.android.settings.cyanogenmod.superuser;
 +
 +public class SuReceiver extends com.koushikdutta.superuser.SuReceiver {
 +}
-+

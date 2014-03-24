@@ -24,6 +24,10 @@ source build/envsetup.sh
 if [ -f .repo/local_manifests/roomservice.xml ] ; then 
     rm .repo/local_manifests/roomservice.xml
 fi
+if [ -z "$ANDROID_BUILD_TOP" ] ; then
+    echo "Setting ANDROID_BUILD_TOP"
+    ANDROID_BUILD_TOP=$(gettop)
+fi
 
 # Reset Modules to be patched
 echo "Resetting Modules which will be patched"
