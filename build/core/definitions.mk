@@ -33,3 +33,16 @@ define expand-required-modules
 $(call expand-required-modules-old,$(1),$(2))\
 $(eval $(1) := $(filter-out $(PRODUCT_PACKAGES_FILTER),$($(1))))
 endef
+
+## Override MKBOOTIMG with a custom one if configured 
+## This is a bit of a hack but we get away with it as 
+## definitions.mk is included after config.mk where this
+## is originally defined
+ifneq (,$(strip $(BOARD_CUSTOM_MKBOOTIMG)))
+MKBOOTIMG := $(BOARD_CUSTOM_MKBOOTIMG)
+$(info "MKBOOTIMG $(MKBOOTIMG)")
+endif
+
+
+
+

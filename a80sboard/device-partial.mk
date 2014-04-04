@@ -35,4 +35,5 @@ PRODUCT_PACKAGES := \
     patch-X.0 \
     libtcl-ril \
     pppd_secrets \
-    utility_kdflasher
+    utility_kdflasher \
+    mkbootimg-a80sboard
